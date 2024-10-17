@@ -1,56 +1,45 @@
-using System.Collections;
 using System.Collections.Generic;
-using System.Linq;
 using UnityEngine;
 
 public class Kim : CharacterController
 {
     [SerializeField] float ContextRadius;
+    private Pathfinding pathfinding;
+    private List<Grid.Tile> currentPath;
+    private int currentPathIndex = 0;
 
     public override void StartCharacter()
     {
         base.StartCharacter();
+        pathfinding = new Pathfinding(Grid.Instance);
+
+        // Find the initial path to the finish line
+        Grid.Tile startTile = Grid.Instance.GetClosest(transform.position);
+        Grid.Tile finishTile = Grid.Instance.GetFinishTile();
+        currentPath = pathfinding.FindPath(startTile, finishTile);
     }
 
     public override void UpdateCharacter()
     {
         base.UpdateCharacter();
 
-        Zombie closest = GetClosest(GetContextByTag("Zombie"))?.GetComponent<Zombie>();
-    }
-
-    Vector3 GetEndPoint()
-    {
-        return Grid.Instance.WorldPos(Grid.Instance.GetFinishTile());
-    }
-
-    GameObject[] GetContextByTag(string aTag)
-    {
-        Collider[] context = Physics.OverlapSphere(transform.position, ContextRadius);
-        List<GameObject> returnContext = new List<GameObject>();
-        foreach (Collider c in context)
+        if (currentPath != null && currentPathIndex < currentPath.Count)
         {
-            if (c.transform.CompareTag(aTag))
-            {
-                returnContext.Add(c.gameObject);
-            }
+            MoveAlongPath();
         }
-        return returnContext.ToArray();
     }
 
-    GameObject GetClosest(GameObject[] aContext)
+    private void MoveAlongPath()
     {
-        float dist = float.MaxValue;
-        GameObject Closest = null;
-        foreach (GameObject z in aContext)
+        Grid.Tile targetTile = currentPath[currentPathIndex];
+        Vector3 targetPosition = Grid.Instance.WorldPos(targetTile);
+
+        // Move toward the next tile
+        transform.position = Vector3.MoveTowards(transform.position, targetPosition, Time.deltaTime * CharacterMoveSpeed);
+
+        if (Vector3.Distance(transform.position, targetPosition) < ReachDistThreshold)
         {
-            float curDist = Vector3.Distance(transform.position, z.transform.position);
-            if (curDist < dist)
-            {
-                dist = curDist;
-                Closest = z;
-            }
+            currentPathIndex++;
         }
-        return Closest;
     }
 }

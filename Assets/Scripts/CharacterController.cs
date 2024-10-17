@@ -18,8 +18,8 @@ using UnityEngine;
 
 public class CharacterController : MonoBehaviour
 {
-    const float ReachDistThreshold = 0.1f;
-    const float CharacterMoveSpeed = 1.0f;
+    protected const float ReachDistThreshold = 0.1f;
+    protected const float CharacterMoveSpeed = 1.0f;
     protected Animator myAnimator;
 
     protected Grid.Tile myCurrentTile = null;
