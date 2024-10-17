@@ -12,110 +12,112 @@ public class Pathfinding
 
     public List<Grid.Tile> FindPath(Grid.Tile startTile, Grid.Tile targetTile)
     {
-        // Create a dictionary to map Grid.Tile to PathNode
-        Dictionary<Grid.Tile, PathNode> pathNodes = new Dictionary<Grid.Tile, PathNode>();
+        List<Grid.Tile> openSet = new List<Grid.Tile> { startTile };
+        HashSet<Grid.Tile> closedSet = new HashSet<Grid.Tile>();
 
-        // Initialize path nodes for every tile in the grid
-        foreach (Grid.Tile tile in grid.GetTiles())
+        Dictionary<Grid.Tile, Grid.Tile> cameFrom = new Dictionary<Grid.Tile, Grid.Tile>();
+        Dictionary<Grid.Tile, int> gScore = new Dictionary<Grid.Tile, int>();
+        Dictionary<Grid.Tile, int> fScore = new Dictionary<Grid.Tile, int>();
+
+        gScore[startTile] = 0;
+        fScore[startTile] = GetHeuristic(startTile, targetTile);
+
+        while (openSet.Count > 0)
         {
-            pathNodes[tile] = new PathNode(tile);
-        }
+            Grid.Tile currentTile = GetLowestFScoreTile(openSet, fScore);
 
-        PathNode startNode = pathNodes[startTile];
-        PathNode targetNode = pathNodes[targetTile];
-
-        List<PathNode> openList = new List<PathNode> { startNode };
-        HashSet<PathNode> closedList = new HashSet<PathNode>();
-
-        startNode.gCost = 0;
-
-        while (openList.Count > 0)
-        {
-            PathNode currentNode = GetNodeWithLowestFCost(openList);
-
-            if (currentNode == targetNode)
+            if (currentTile == targetTile)
             {
-                Debug.Log("Path to target found.");
-                return RetracePath(startNode, targetNode);
+                return ReconstructPath(cameFrom, currentTile); // Found the path
             }
 
-            openList.Remove(currentNode);
-            closedList.Add(currentNode);
+            openSet.Remove(currentTile);
+            closedSet.Add(currentTile);
 
-            foreach (Grid.Tile neighborTile in GetNeighbors(currentNode.tile))
+            foreach (Grid.Tile neighbor in GetNeighbors(currentTile))
             {
-                PathNode neighborNode = pathNodes[neighborTile];
-
-                if (neighborTile.occupied || closedList.Contains(neighborNode))
-                    continue;
-
-                int newGCost = currentNode.gCost + GetDistance(currentNode.tile, neighborNode.tile);
-                if (newGCost < neighborNode.gCost || !openList.Contains(neighborNode))
+                if (closedSet.Contains(neighbor) || neighbor.occupied) // Skip occupied or already processed tiles
                 {
-                    neighborNode.gCost = newGCost;
-                    neighborNode.hCost = GetDistance(neighborNode.tile, targetNode.tile);
-                    neighborNode.parent = currentNode;
+                    continue;
+                }
 
-                    // Log the gCost, hCost, and fCost for debugging
-                    Debug.Log("Tile: (" + neighborTile.x + "," + neighborTile.y + "), gCost: " + neighborNode.gCost + ", hCost: " + neighborNode.hCost + ", fCost: " + neighborNode.FCost);
+                int tentativeGScore = gScore[currentTile] + 1; // Distance between adjacent tiles is always 1
 
-                    if (!openList.Contains(neighborNode))
-                        openList.Add(neighborNode);
+                if (!gScore.ContainsKey(neighbor) || tentativeGScore < gScore[neighbor])
+                {
+                    cameFrom[neighbor] = currentTile;
+                    gScore[neighbor] = tentativeGScore;
+                    fScore[neighbor] = gScore[neighbor] + GetHeuristic(neighbor, targetTile);
+
+                    if (!openSet.Contains(neighbor))
+                    {
+                        openSet.Add(neighbor);
+                    }
                 }
             }
         }
 
-        Debug.LogError("No path found.");
+        Debug.LogError("No path found!");
         return null; // No path found
     }
 
-
-    // Helper methods
-
-    private PathNode GetNodeWithLowestFCost(List<PathNode> openList)
-    {
-        PathNode lowestFCostNode = openList[0];
-        foreach (PathNode node in openList)
-        {
-            if (node.FCost < lowestFCostNode.FCost)
-                lowestFCostNode = node;
-        }
-        return lowestFCostNode;
-    }
-
+    // Get the neighbors of the current tile, restricted to up, down, left, and right
     private List<Grid.Tile> GetNeighbors(Grid.Tile tile)
     {
         List<Grid.Tile> neighbors = new List<Grid.Tile>();
+
+        // Only allow movement in the four cardinal directions (up, down, left, right)
         Vector2Int[] directions = { Vector2Int.up, Vector2Int.down, Vector2Int.left, Vector2Int.right };
 
         foreach (Vector2Int dir in directions)
         {
-            Grid.Tile neighbor = grid.TryGetTile(new Vector2Int(tile.x + dir.x, tile.y + dir.y));
-            if (neighbor != null)
-                neighbors.Add(neighbor);
+            Grid.Tile neighbor = Grid.Instance.TryGetTile(new Vector2Int(tile.x + dir.x, tile.y + dir.y));
+            if (neighbor != null && !neighbor.occupied)
+            {
+                neighbors.Add(neighbor); // Add only unoccupied neighboring tiles
+            }
         }
+
         return neighbors;
     }
 
-    private int GetDistance(Grid.Tile a, Grid.Tile b)
+
+
+    // Heuristic function (Manhattan distance for grid movement)
+    private int GetHeuristic(Grid.Tile a, Grid.Tile b)
     {
-        int distX = Mathf.Abs(a.x - b.x);
-        int distY = Mathf.Abs(a.y - b.y);
-        return distX + distY; // Manhattan distance
+        return Mathf.Abs(a.x - b.x) + Mathf.Abs(a.y - b.y); // Manhattan distance (no diagonals)
     }
 
-    private List<Grid.Tile> RetracePath(PathNode startNode, PathNode endNode)
+    // Get the tile with the lowest F score
+    private Grid.Tile GetLowestFScoreTile(List<Grid.Tile> openSet, Dictionary<Grid.Tile, int> fScore)
     {
-        List<Grid.Tile> path = new List<Grid.Tile>();
-        PathNode currentNode = endNode;
+        Grid.Tile lowestFScoreTile = openSet[0];
+        int lowestFScore = fScore[lowestFScoreTile];
 
-        while (currentNode != startNode)
+        foreach (Grid.Tile tile in openSet)
         {
-            path.Add(currentNode.tile);
-            currentNode = currentNode.parent;
+            if (fScore.ContainsKey(tile) && fScore[tile] < lowestFScore)
+            {
+                lowestFScore = fScore[tile];
+                lowestFScoreTile = tile;
+            }
         }
 
-        path.Reverse();
+        return lowestFScoreTile;
+    }
+
+    // Reconstruct the path by backtracking through the "cameFrom" map
+    private List<Grid.Tile> ReconstructPath(Dictionary<Grid.Tile, Grid.Tile> cameFrom, Grid.Tile currentTile)
+    {
+        List<Grid.Tile> path = new List<Grid.Tile> { currentTile };
+
+        while (cameFrom.ContainsKey(currentTile))
+        {
+            currentTile = cameFrom[currentTile];
+            path.Insert(0, currentTile); // Insert the tile at the start of the list to reverse the path
+        }
+
         return path;
     }
 }

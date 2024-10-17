@@ -7,22 +7,27 @@ public class Kim : CharacterController
     private Pathfinding pathfinding;
     private List<Grid.Tile> currentPath;
     private int currentPathIndex = 0;
-    private List<Grid.Tile> previousZombieTiles = new List<Grid.Tile>(); // Track previously marked zombie tiles
+    private List<Grid.Tile> previousZombieTiles = new List<Grid.Tile>();
 
-    protected const float ReachDistThreshold = 1.0f;
-    protected const float CharacterMoveSpeed = 3.0f;
+    // New list to store burger positions at the start
+    private List<Grid.Tile> burgerTiles;
+
+    protected const float ReachDistThreshold = 0.1f;
+    protected const float CharacterMoveSpeed = 2.0f;
 
     public override void StartCharacter()
     {
         base.StartCharacter();
         pathfinding = new Pathfinding(Grid.Instance);
 
-        // Snap Kim to the nearest grid tile
+        // Snap Kim to the nearest grid tile to avoid starting misalignment
         transform.position = Grid.Instance.WorldPos(Grid.Instance.GetClosest(transform.position));
 
-        // Initialize the first path to the finish line or burger
-        Grid.Tile burgerTile = GetClosestBurgerTile();
-        Grid.Tile targetTile = burgerTile != null ? burgerTile : Grid.Instance.GetFinishTile();
+        // Initialize burger tiles at the start of the game
+        burgerTiles = GetAllBurgerTiles();
+
+        // Get the path to the closest burger at the beginning
+        Grid.Tile targetTile = GetClosestBurgerTile() ?? Grid.Instance.GetFinishTile();
 
         // Detect zombies and mark their tiles as occupied
         List<Grid.Tile> zombieTiles = GetTilesNearZombies();
@@ -55,30 +60,39 @@ public class Kim : CharacterController
 
         // Get the tiles near the current zombies and mark them
         List<Grid.Tile> zombieTiles = GetTilesNearZombies();
-        previousZombieTiles = zombieTiles; // Save the currently marked tiles for the next reset
+        previousZombieTiles = zombieTiles;
 
-        // Check for burgers nearby
-        Grid.Tile burgerTile = GetClosestBurgerTile();
-        Grid.Tile targetTile = burgerTile != null ? burgerTile : Grid.Instance.GetFinishTile();
-
-        // Recalculate path if needed
-        Grid.Tile currentTargetTile = currentPath != null && currentPathIndex < currentPath.Count
-            ? currentPath[currentPath.Count - 1]
-            : null;
-
-        if (currentTargetTile == null || targetTile != currentTargetTile)
+        // Check if Kim has already collected the current burger
+        if (burgerTiles.Count > 0)
         {
-            Grid.Tile startTile = Grid.Instance.GetClosest(transform.position);
-            currentPath = pathfinding.FindPath(startTile, targetTile);
+            // If there are still burgers, set the closest one as the target
+            Grid.Tile targetTile = GetClosestBurgerTile() ?? Grid.Instance.GetFinishTile();
 
-            if (currentPath != null && currentPath.Count > 0)
+            // Recalculate path if needed
+            Grid.Tile currentTargetTile = currentPath != null && currentPathIndex < currentPath.Count
+                ? currentPath[currentPath.Count - 1]
+                : null;
+
+            if (currentTargetTile == null || targetTile != currentTargetTile)
             {
-                Debug.Log("Recalculated path. Number of tiles: " + currentPath.Count);
+                Grid.Tile startTile = Grid.Instance.GetClosest(transform.position);
+                currentPath = pathfinding.FindPath(startTile, targetTile);
+
+                if (currentPath != null && currentPath.Count > 0)
+                {
+                    Debug.Log("Recalculated path. Number of tiles: " + currentPath.Count);
+                }
+                else
+                {
+                    Debug.LogError("No path found!");
+                }
             }
-            else
-            {
-                Debug.LogError("No path found!");
-            }
+        }
+        else
+        {
+            // If no more burgers, head to the finish line
+            Grid.Tile targetTile = Grid.Instance.GetFinishTile();
+            RecalculatePathToTarget(targetTile);
         }
 
         if (currentPath != null && currentPathIndex < currentPath.Count)
@@ -95,62 +109,78 @@ public class Kim : CharacterController
         Grid.Tile targetTile = currentPath[currentPathIndex];
         Vector3 targetPosition = Grid.Instance.WorldPos(targetTile);
 
-        // Log Kim's movement details
-        Debug.Log("Kim position: " + transform.position + " | Target tile: " + currentPathIndex + " at position: " + targetPosition);
+        // Calculate the direction to the target tile (restricted to grid axes)
+        Vector3 direction = (targetPosition - transform.position).normalized;
 
-        // Visualize the path by drawing lines between the tiles in the path
+        if (Mathf.Abs(direction.x) > Mathf.Abs(direction.z))
+        {
+            direction = new Vector3(Mathf.Sign(direction.x), 0, 0);
+        }
+        else
+        {
+            direction = new Vector3(0, 0, Mathf.Sign(direction.z));
+        }
+
+        // Move Kim toward the target tile
+        transform.position += direction * CharacterMoveSpeed * Time.deltaTime;
+
+        // Snap to the target tile once Kim is close enough
+        if (Vector3.Distance(transform.position, targetPosition) < ReachDistThreshold)
+        {
+            transform.position = targetPosition;
+            Debug.Log("Kim reached tile " + currentPathIndex);
+            currentPathIndex++;
+        }
+
+        // Visualize the path
         for (int i = 0; i < currentPath.Count - 1; i++)
         {
             Vector3 from = Grid.Instance.WorldPos(currentPath[i]);
             Vector3 to = Grid.Instance.WorldPos(currentPath[i + 1]);
-            Debug.DrawLine(from, to, Color.red, 5f); // Draw a red line for 5 seconds between each tile
-        }
-
-        // Move toward the next tile
-        transform.position = Vector3.MoveTowards(transform.position, targetPosition, Time.deltaTime * CharacterMoveSpeed);
-
-        // Check if Kim has reached the current target tile, then move to the next tile
-        if (Vector3.Distance(transform.position, targetPosition) < ReachDistThreshold)
-        {
-            Debug.Log("Kim reached tile " + currentPathIndex);
-            currentPathIndex++;
+            Debug.DrawLine(from, to, Color.red, 0.5f);
         }
     }
 
-
-    // Detect nearby zombies and mark a 3-tile radius around them as occupied
-    // Detect nearby zombies and mark a 3-tile radius around them as occupied
-    private List<Grid.Tile> GetTilesNearZombies()
+    // Store the positions of all burgers at the start of the game
+    private List<Grid.Tile> GetAllBurgerTiles()
     {
-        List<Grid.Tile> zombieTiles = new List<Grid.Tile>();
+        List<Grid.Tile> burgerTiles = new List<Grid.Tile>();
         Collider[] hits = Physics.OverlapSphere(transform.position, ContextRadius);
 
         foreach (Collider hit in hits)
         {
-            if (hit.CompareTag("Zombie"))
+            if (hit.CompareTag("Burger"))
             {
-                Grid.Tile zombieTile = Grid.Instance.GetClosest(hit.transform.position);
-
-                // Mark a 3-tile radius around the zombie as occupied
-                for (int x = -3; x <= 3; x++)
+                Grid.Tile burgerTile = Grid.Instance.GetClosest(hit.transform.position);
+                if (burgerTile != null)
                 {
-                    for (int y = -3; y <= 3; y++)
-                    {
-                        Grid.Tile nearbyTile = Grid.Instance.TryGetTile(new Vector2Int(zombieTile.x + x, zombieTile.y + y));
-                        if (nearbyTile != null && !nearbyTile.occupied)
-                        {
-                            nearbyTile.occupied = true;
-                            zombieTiles.Add(nearbyTile); // Correct capitalization
-                            Debug.Log("Marking tile (" + nearbyTile.x + ", " + nearbyTile.y + ") as occupied.");
-                        }
-                    }
+                    burgerTiles.Add(burgerTile);
                 }
             }
         }
 
-        return zombieTiles;
+        return burgerTiles;
     }
 
+    // Find the closest burger tile from the stored list of burger positions
+    private Grid.Tile GetClosestBurgerTile()
+    {
+        Grid.Tile closestBurgerTile = null;
+        float shortestDistance = float.MaxValue;
+
+        foreach (Grid.Tile burgerTile in burgerTiles)
+        {
+            float distance = Vector3.Distance(transform.position, Grid.Instance.WorldPos(burgerTile));
+
+            if (distance < shortestDistance)
+            {
+                shortestDistance = distance;
+                closestBurgerTile = burgerTile;
+            }
+        }
+
+        return closestBurgerTile;
+    }
 
     // Reset previously marked zombie tiles
     private void ResetZombieTiles(List<Grid.Tile> zombieTiles)
@@ -162,28 +192,48 @@ public class Kim : CharacterController
         }
     }
 
-    // Detect nearby burgers and choose the closest one
-    private Grid.Tile GetClosestBurgerTile()
+    // Mark a 3-tile radius around zombies as occupied
+    private List<Grid.Tile> GetTilesNearZombies()
     {
+        List<Grid.Tile> zombieTiles = new List<Grid.Tile>();
         Collider[] hits = Physics.OverlapSphere(transform.position, ContextRadius);
-        Grid.Tile closestBurgerTile = null;
-        float shortestDistance = float.MaxValue;
 
         foreach (Collider hit in hits)
         {
-            if (hit.CompareTag("Burger"))
+            if (hit.CompareTag("Zombie"))
             {
-                Grid.Tile burgerTile = Grid.Instance.GetClosest(hit.transform.position);
-                float distance = Vector3.Distance(transform.position, Grid.Instance.WorldPos(burgerTile));
+                Grid.Tile zombieTile = Grid.Instance.GetClosest(hit.transform.position);
 
-                if (distance < shortestDistance)
+                for (int x = -3; x <= 3; x++)
                 {
-                    shortestDistance = distance;
-                    closestBurgerTile = burgerTile;
+                    for (int y = -3; y <= 3; y++)
+                    {
+                        Grid.Tile nearbyTile = Grid.Instance.TryGetTile(new Vector2Int(zombieTile.x + x, zombieTile.y + y));
+                        if (nearbyTile != null && !nearbyTile.occupied)
+                        {
+                            nearbyTile.occupied = true;
+                            zombieTiles.Add(nearbyTile);
+                        }
+                    }
                 }
             }
         }
 
-        return closestBurgerTile;
+        return zombieTiles;
+    }
+
+    private void RecalculatePathToTarget(Grid.Tile targetTile)
+    {
+        Grid.Tile startTile = Grid.Instance.GetClosest(transform.position);
+        currentPath = pathfinding.FindPath(startTile, targetTile);
+
+        if (currentPath != null && currentPath.Count > 0)
+        {
+            Debug.Log("Recalculated path. Number of tiles: " + currentPath.Count);
+        }
+        else
+        {
+            Debug.LogError("No path found!");
+        }
     }
 }
