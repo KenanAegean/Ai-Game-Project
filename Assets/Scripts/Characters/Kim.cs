@@ -62,43 +62,36 @@ public class Kim : CharacterController
         List<Grid.Tile> zombieTiles = GetTilesNearZombies();
         previousZombieTiles = zombieTiles;
 
-        // Check if Kim has already collected the current burger
-        if (burgerTiles.Count > 0)
+        // Always recalculate the path to the closest burger if there are still burgers left
+        Grid.Tile targetTile = GetClosestBurgerTile() ?? Grid.Instance.GetFinishTile();
+
+        // Recalculate path if needed
+        Grid.Tile currentTargetTile = currentPath != null && currentPathIndex < currentPath.Count
+            ? currentPath[currentPath.Count - 1]
+            : null;
+
+        if (currentTargetTile == null || targetTile != currentTargetTile)
         {
-            // If there are still burgers, set the closest one as the target
-            Grid.Tile targetTile = GetClosestBurgerTile() ?? Grid.Instance.GetFinishTile();
+            Grid.Tile startTile = Grid.Instance.GetClosest(transform.position);
+            currentPath = pathfinding.FindPath(startTile, targetTile);
 
-            // Recalculate path if needed
-            Grid.Tile currentTargetTile = currentPath != null && currentPathIndex < currentPath.Count
-                ? currentPath[currentPath.Count - 1]
-                : null;
-
-            if (currentTargetTile == null || targetTile != currentTargetTile)
+            if (currentPath != null && currentPath.Count > 0)
             {
-                Grid.Tile startTile = Grid.Instance.GetClosest(transform.position);
-                currentPath = pathfinding.FindPath(startTile, targetTile);
-
-                if (currentPath != null && currentPath.Count > 0)
-                {
-                    Debug.Log("Recalculated path. Number of tiles: " + currentPath.Count);
-                }
-                else
-                {
-                    Debug.LogError("No path found!");
-                }
+                Debug.Log("Recalculated path. Number of tiles: " + currentPath.Count);
             }
-        }
-        else
-        {
-            // If no more burgers, head to the finish line
-            Grid.Tile targetTile = Grid.Instance.GetFinishTile();
-            RecalculatePathToTarget(targetTile);
+            else
+            {
+                Debug.LogError("No path found!");
+            }
         }
 
         if (currentPath != null && currentPathIndex < currentPath.Count)
         {
             MoveAlongPath();
         }
+
+        // Check if Kim reached a burger and update burger list
+        CheckAndCollectBurger();
     }
 
     private void MoveAlongPath()
@@ -180,6 +173,18 @@ public class Kim : CharacterController
         }
 
         return closestBurgerTile;
+    }
+
+    // Check if Kim has collected a burger, and if so, remove it from the list
+    private void CheckAndCollectBurger()
+    {
+        Grid.Tile currentTile = Grid.Instance.GetClosest(transform.position);
+
+        if (burgerTiles.Contains(currentTile))
+        {
+            burgerTiles.Remove(currentTile); // Remove the collected burger from the list
+            Debug.Log("Burger collected at tile: " + currentTile.x + ", " + currentTile.y);
+        }
     }
 
     // Reset previously marked zombie tiles
