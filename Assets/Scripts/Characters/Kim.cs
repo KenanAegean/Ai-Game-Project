@@ -35,10 +35,6 @@ public class Kim : CharacterController
         // Set the initial path to the nearest burger
         SetPathToClosestBurger();
 
-        // Detect zombies and mark their tiles as occupied
-        List<Grid.Tile> zombieTiles = GetTilesNearZombies();
-        previousZombieTiles = zombieTiles;
-
         Debug.Log("Kim's starting position: " + transform.position);
     }
 
@@ -104,12 +100,9 @@ public class Kim : CharacterController
     }
 
     // Store the positions of all burgers at the start of the game
-    // Store the positions of all burgers at the start of the game
     private List<Grid.Tile> GetAllBurgerTiles()
     {
         List<Grid.Tile> burgerTiles = new List<Grid.Tile>();
-
-        // Directly find all GameObjects with the tag "Burger"
         GameObject[] allBurgers = GameObject.FindGameObjectsWithTag("Burger");
 
         foreach (GameObject burger in allBurgers)
@@ -122,15 +115,8 @@ public class Kim : CharacterController
             }
         }
 
-        // If no burgers are found, log an error
-        if (burgerTiles.Count == 0)
-        {
-            Debug.LogError("No burgers found!");
-        }
-
         return burgerTiles;
     }
-
 
     // Set path to the closest burger or finish line if no burgers are left
     private void SetPathToClosestBurger()
