@@ -17516,6 +17516,11 @@ PrefabInstance:
       propertyPath: myKim
       value: 
       objectReference: {fileID: 601951312}
+    - target: {fileID: 1034124237691063017, guid: 078ac4cfd02656d4eafd0ef44e98033a,
+        type: 3}
+      propertyPath: SkipIntro
+      value: 1
+      objectReference: {fileID: 0}
     - target: {fileID: 4601961738845201628, guid: 078ac4cfd02656d4eafd0ef44e98033a,
         type: 3}
       propertyPath: m_LocalPosition.x
