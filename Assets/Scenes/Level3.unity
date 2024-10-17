@@ -9530,7 +9530,7 @@ PrefabInstance:
     - target: {fileID: 1034124237691063017, guid: 078ac4cfd02656d4eafd0ef44e98033a,
         type: 3}
       propertyPath: SkipIntro
-      value: 0
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 1034124237691063017, guid: 078ac4cfd02656d4eafd0ef44e98033a,
         type: 3}
