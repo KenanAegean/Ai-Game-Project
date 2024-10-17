@@ -12,6 +12,13 @@ public class Kim : CharacterController
     // Store burger positions
     private List<Grid.Tile> burgerTiles;
 
+    // Timer for recalculating path when zombies are near
+    private float zombieCheckTimer = 1.0f; // Check every second
+    private float timeSinceLastCheck = 0f;
+
+    // Status flag for waiting if zombies block the path
+    private bool isWaitingForZombies = false;
+
     protected const float ReachDistThreshold = 0.1f;
     protected const float CharacterMoveSpeed = 2.0f;
 
@@ -45,12 +52,33 @@ public class Kim : CharacterController
         // Reset previously marked zombie tiles
         ResetZombieTiles(previousZombieTiles);
 
-        // Get the tiles near the current zombies and mark them
-        List<Grid.Tile> zombieTiles = GetTilesNearZombies();
-        previousZombieTiles = zombieTiles;
+        // Check for zombies periodically (every second)
+        timeSinceLastCheck += Time.deltaTime;
+        if (timeSinceLastCheck >= zombieCheckTimer)
+        {
+            timeSinceLastCheck = 0f; // Reset the timer
 
-        // Move Kim along the current path
-        if (currentPath != null && currentPathIndex < currentPath.Count)
+            // If Kim is waiting for zombies to move, retry pathfinding
+            if (isWaitingForZombies)
+            {
+                Debug.Log("Retrying pathfinding after waiting for zombies to move...");
+                TryRecalculatePathToTarget();
+            }
+            else
+            {
+                List<Grid.Tile> zombieTiles = GetTilesNearZombies();
+                if (zombieTiles.Count > 0)
+                {
+                    // Recalculate path if zombies are nearby
+                    Debug.Log("Zombies detected, recalculating path...");
+                    SetPathToClosestBurger();
+                }
+                previousZombieTiles = zombieTiles;
+            }
+        }
+
+        // Move Kim along the current path if not waiting for zombies
+        if (!isWaitingForZombies && currentPath != null && currentPathIndex < currentPath.Count)
         {
             MoveAlongPath();
         }
@@ -219,7 +247,28 @@ public class Kim : CharacterController
         return zombieTiles;
     }
 
-    // Recalculate the path to the given target tile
+    // Try to recalculate the path to the target
+    private void TryRecalculatePathToTarget()
+    {
+        Grid.Tile startTile = Grid.Instance.GetClosest(transform.position);
+        Grid.Tile targetTile = GetClosestBurgerTile() ?? Grid.Instance.GetFinishTile();
+
+        currentPath = pathfinding.FindPath(startTile, targetTile);
+
+        if (currentPath == null || currentPath.Count == 0)
+        {
+            Debug.Log("No path found. Waiting for zombies to move...");
+            isWaitingForZombies = true;
+        }
+        else
+        {
+            Debug.Log("Path found. Resuming movement.");
+            isWaitingForZombies = false;
+            currentPathIndex = 0; // Reset the path index
+        }
+    }
+
+    // Recalculate the path to the given target
     private void RecalculatePathToTarget(Grid.Tile targetTile)
     {
         Grid.Tile startTile = Grid.Instance.GetClosest(transform.position);
@@ -233,6 +282,7 @@ public class Kim : CharacterController
         else
         {
             Debug.LogError("No path found!");
+            isWaitingForZombies = true; // Start waiting if no path is found
         }
     }
 }
