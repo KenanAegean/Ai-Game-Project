@@ -35,6 +35,7 @@ public class Pathfinding
 
             if (currentNode == targetNode)
             {
+                Debug.Log("Path to target found.");
                 return RetracePath(startNode, targetNode);
             }
 
@@ -55,14 +56,19 @@ public class Pathfinding
                     neighborNode.hCost = GetDistance(neighborNode.tile, targetNode.tile);
                     neighborNode.parent = currentNode;
 
+                    // Log the gCost, hCost, and fCost for debugging
+                    Debug.Log("Tile: (" + neighborTile.x + "," + neighborTile.y + "), gCost: " + neighborNode.gCost + ", hCost: " + neighborNode.hCost + ", fCost: " + neighborNode.FCost);
+
                     if (!openList.Contains(neighborNode))
                         openList.Add(neighborNode);
                 }
             }
         }
 
+        Debug.LogError("No path found.");
         return null; // No path found
     }
+
 
     // Helper methods
 
