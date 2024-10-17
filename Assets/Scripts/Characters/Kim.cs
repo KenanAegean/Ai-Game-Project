@@ -29,10 +29,13 @@ public class Kim : CharacterController
     public override void StartCharacter()
     {
         base.StartCharacter();
+
+        // Pathfinding setup
         pathfinding = new Pathfinding(Grid.Instance);
 
-        // Snap Kim to the nearest grid tile to avoid starting misalignment
+        // Snap Kim to the nearest grid tile only once during start to avoid misalignment
         transform.position = Grid.Instance.WorldPos(Grid.Instance.GetClosest(transform.position));
+        Debug.Log("Kim's initial position: " + transform.position);
 
         // Get all burger positions at the start
         burgerTiles = GetAllBurgerTiles();
@@ -45,8 +48,7 @@ public class Kim : CharacterController
 
         // Set the initial path to the nearest burger
         SetPathToClosestBurger();
-
-        Debug.Log("Kim's starting position: " + transform.position);
+        Debug.Log("Kim's starting path to the nearest burger.");
     }
 
     public override void UpdateCharacter()
@@ -55,6 +57,9 @@ public class Kim : CharacterController
 
         // Clear previous dynamic occupied zones
         ResetDynamicOccupiedTiles();
+
+        // Debugging Kim's position
+        Debug.Log("Kim's current position: " + transform.position);
 
         // Check for danger zone recalculation or path recheck every second
         timeSinceLastCheck += Time.deltaTime;
@@ -113,6 +118,9 @@ public class Kim : CharacterController
         Grid.Tile targetTile = currentPath[currentPathIndex];
         Vector3 targetPosition = Grid.Instance.WorldPos(targetTile);
 
+        // Debug the target position
+        Debug.Log($"Moving towards tile {currentPathIndex} at position {targetPosition}");
+
         // Calculate the direction to the target tile (restricted to grid axes)
         Vector3 direction = (targetPosition - transform.position).normalized;
 
@@ -131,6 +139,7 @@ public class Kim : CharacterController
         // Snap to the target tile once Kim is close enough
         if (Vector3.Distance(transform.position, targetPosition) < ReachDistThreshold)
         {
+            Debug.Log("Reached tile " + currentPathIndex);
             transform.position = targetPosition;
             currentPathIndex++;
         }
