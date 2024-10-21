@@ -15,13 +15,19 @@ public class Kim : CharacterController
     private float pathCheckTimer = 1.0f; // Check every second
     private float timeSinceLastCheck = 0f;
 
-    // Status flag for being in the danger zone
-    private bool isInDangerZone = false;
-    private bool wasInDangerZoneLastFrame = false; // Track previous state
-    private bool isWaitingForPath = false; // Track waiting for path state
+    // Status flags
+    public bool isInDangerZone = false;
+    private bool wasInDangerZoneLastFrame = false;
+    private bool isWaitingForPath = false;
 
-    // Store dynamically marked tiles (for resetting)
+    // Dynamic occupied tiles
     private List<Grid.Tile> dynamicOccupiedTiles = new List<Grid.Tile>();
+
+    // Blackboard to store data for the behavior tree
+    private Blackboard blackboard = new Blackboard();
+
+    // Define the behavior tree nodes
+    private BehaviorTree behaviorTree;
 
     protected const float ReachDistThreshold = 0.1f;
     protected const float CharacterMoveSpeed = 2.0f;
@@ -35,20 +41,29 @@ public class Kim : CharacterController
 
         // Snap Kim to the nearest grid tile only once during start to avoid misalignment
         transform.position = Grid.Instance.WorldPos(Grid.Instance.GetClosest(transform.position));
-        Debug.Log("Kim's initial position: " + transform.position);
 
         // Get all burger positions at the start
         burgerTiles = GetAllBurgerTiles();
 
-        if (burgerTiles.Count == 0)
-        {
-            Debug.LogError("No burgers found!");
-            return;
-        }
+        // Set up the blackboard with initial information
+        blackboard.Set("burgers", burgerTiles);
+
+        // Initialize the behavior tree
+        behaviorTree = new BehaviorTree(
+            new Selector(
+                new Sequence(
+                    new IsInDangerZone(blackboard, this),
+                    new RecalculatePathAction(this)
+                ),
+                new Sequence(
+                    new IsPathClear(blackboard),
+                    new MoveToBurgerAction(this, blackboard)
+                )
+            )
+        );
 
         // Set the initial path to the nearest burger
         SetPathToClosestBurger();
-        Debug.Log("Kim's starting path to the nearest burger.");
     }
 
     public override void UpdateCharacter()
@@ -58,59 +73,30 @@ public class Kim : CharacterController
         // Clear previous dynamic occupied zones
         ResetDynamicOccupiedTiles();
 
-        // Debugging Kim's position
-        Debug.Log("Kim's current position: " + transform.position);
-
-        // Check for danger zone recalculation or path recheck every second
-        timeSinceLastCheck += Time.deltaTime;
-        if (timeSinceLastCheck >= pathCheckTimer)
-        {
-            timeSinceLastCheck = 0f; // Reset the timer
-
-            // Check if Kim is waiting for a path to clear
-            if (isWaitingForPath)
-            {
-                Debug.Log("Kim is waiting for a path to clear...");
-                ReattemptPathToTarget(); // Retry pathfinding
-            }
-            else
-            {
-                // Check if Kim is inside a danger zone
-                List<Grid.Tile> zombieTiles = MarkDynamicZombieZones();
-
-                if (isInDangerZone && !wasInDangerZoneLastFrame)
-                {
-                    Debug.Log("Kim entered the danger zone. Recalculating path.");
-                    TryRecalculatePathToTarget(); // Recalculate path immediately on entering
-                    wasInDangerZoneLastFrame = true; // Set state as just entered the danger zone
-                }
-                else if (isInDangerZone && wasInDangerZoneLastFrame)
-                {
-                    Debug.Log("Kim is still in the danger zone. Recalculating path again.");
-                    TryRecalculatePathToTarget(); // Recalculate path every second while in danger zone
-                }
-                else if (!isInDangerZone && wasInDangerZoneLastFrame)
-                {
-                    Debug.Log("Kim exited the danger zone.");
-                    wasInDangerZoneLastFrame = false; // Reset the danger zone flag
-                }
-            }
-        }
-
-        // Move Kim along the current path if a valid path is found
-        if (currentPath != null && currentPathIndex < currentPath.Count && !isWaitingForPath)
-        {
-            MoveAlongPath();
-        }
-
-        // Check if Kim has reached a burger
-        CheckAndCollectBurger();
+        // Update the behavior tree every frame
+        behaviorTree.Execute();
 
         // Visualize occupied and danger zones
         VisualizeZombieZones();
     }
 
-    private void MoveAlongPath()
+    private void SetPathToClosestBurger()
+    {
+        if (burgerTiles.Count == 0)
+        {
+            Grid.Tile finishTile = Grid.Instance.GetFinishTile();
+            RecalculatePathToTarget(finishTile);
+            return;
+        }
+
+        Grid.Tile closestBurger = GetClosestBurgerTile();
+        if (closestBurger != null)
+        {
+            RecalculatePathToTarget(closestBurger);
+        }
+    }
+
+    public void MoveAlongPath()
     {
         if (currentPath == null || currentPathIndex >= currentPath.Count)
             return;
@@ -118,10 +104,6 @@ public class Kim : CharacterController
         Grid.Tile targetTile = currentPath[currentPathIndex];
         Vector3 targetPosition = Grid.Instance.WorldPos(targetTile);
 
-        // Debug the target position
-        Debug.Log($"Moving towards tile {currentPathIndex} at position {targetPosition}");
-
-        // Calculate the direction to the target tile (restricted to grid axes)
         Vector3 direction = (targetPosition - transform.position).normalized;
 
         if (Mathf.Abs(direction.x) > Mathf.Abs(direction.z))
@@ -133,18 +115,14 @@ public class Kim : CharacterController
             direction = new Vector3(0, 0, Mathf.Sign(direction.z));
         }
 
-        // Move Kim toward the target tile
         transform.position += direction * CharacterMoveSpeed * Time.deltaTime;
 
-        // Snap to the target tile once Kim is close enough
         if (Vector3.Distance(transform.position, targetPosition) < ReachDistThreshold)
         {
-            Debug.Log("Reached tile " + currentPathIndex);
             transform.position = targetPosition;
             currentPathIndex++;
         }
 
-        // Visualize the path
         for (int i = 0; i < currentPath.Count - 1; i++)
         {
             Vector3 from = Grid.Instance.WorldPos(currentPath[i]);
@@ -153,7 +131,6 @@ public class Kim : CharacterController
         }
     }
 
-    // Store the positions of all burgers at the start of the game
     private List<Grid.Tile> GetAllBurgerTiles()
     {
         List<Grid.Tile> burgerTiles = new List<Grid.Tile>();
@@ -171,26 +148,6 @@ public class Kim : CharacterController
         return burgerTiles;
     }
 
-    // Set path to the closest burger or finish line if no burgers are left
-    private void SetPathToClosestBurger()
-    {
-        // If there are no burgers left, set the path to the finish line
-        if (burgerTiles.Count == 0)
-        {
-            Grid.Tile finishTile = Grid.Instance.GetFinishTile();
-            RecalculatePathToTarget(finishTile);
-            return;
-        }
-
-        // Set path to the closest burger
-        Grid.Tile closestBurger = GetClosestBurgerTile();
-        if (closestBurger != null)
-        {
-            RecalculatePathToTarget(closestBurger);
-        }
-    }
-
-    // Find the closest burger tile from the stored list of burger positions
     private Grid.Tile GetClosestBurgerTile()
     {
         Grid.Tile closestBurgerTile = null;
@@ -210,36 +167,32 @@ public class Kim : CharacterController
         return closestBurgerTile;
     }
 
-    // Check if Kim has collected a burger, and if so, remove it from the list and set path to the next burger or finish line
     private void CheckAndCollectBurger()
     {
         Grid.Tile currentTile = Grid.Instance.GetClosest(transform.position);
 
         if (burgerTiles.Contains(currentTile))
         {
-            // Remove the collected burger from the list
             burgerTiles.Remove(currentTile);
             SetPathToClosestBurger();
         }
     }
 
-    // Reset previously marked dynamic occupied tiles
     private void ResetDynamicOccupiedTiles()
     {
         foreach (var tile in dynamicOccupiedTiles)
         {
-            tile.occupied = false; // Clear dynamic occupied status
+            tile.occupied = false;
         }
-        dynamicOccupiedTiles.Clear(); // Clear the list for next update
+        dynamicOccupiedTiles.Clear();
     }
 
-    // Mark a 2-tile radius around zombies as occupied and a 4-tile radius as the danger zone dynamically
-    private List<Grid.Tile> MarkDynamicZombieZones()
+    public List<Grid.Tile> MarkDynamicZombieZones()
     {
         List<Grid.Tile> zombieTiles = new List<Grid.Tile>();
         Collider[] hits = Physics.OverlapSphere(transform.position, ContextRadius);
 
-        isInDangerZone = false; // Reset danger zone flag
+        isInDangerZone = false;
 
         foreach (Collider hit in hits)
         {
@@ -247,7 +200,6 @@ public class Kim : CharacterController
             {
                 Grid.Tile zombieTile = Grid.Instance.GetClosest(hit.transform.position);
 
-                // Mark occupied zone (2 tiles around zombie)
                 for (int x = -2; x <= 2; x++)
                 {
                     for (int y = -2; y <= 2; y++)
@@ -256,20 +208,19 @@ public class Kim : CharacterController
                         if (nearbyTile != null && !nearbyTile.occupied)
                         {
                             nearbyTile.occupied = true;
-                            dynamicOccupiedTiles.Add(nearbyTile); // Track dynamic occupied tiles
+                            dynamicOccupiedTiles.Add(nearbyTile);
                         }
                     }
                 }
 
-                // Mark danger zone (4 tiles around zombie)
-                for (int x = -4; x <= 4; x++)
+                for (int x = -3; x <= 3; x++)
                 {
-                    for (int y = -4; y <= 4; y++)
+                    for (int y = -3; y <= 3; y++)
                     {
                         Grid.Tile dangerTile = Grid.Instance.TryGetTile(new Vector2Int(zombieTile.x + x, zombieTile.y + y));
                         if (dangerTile != null && Vector3.Distance(Grid.Instance.WorldPos(dangerTile), transform.position) <= 4)
                         {
-                            isInDangerZone = true; // Kim is in the danger zone
+                            isInDangerZone = true;
                         }
                     }
                 }
@@ -279,8 +230,7 @@ public class Kim : CharacterController
         return zombieTiles;
     }
 
-    // Try to recalculate the path to the target
-    private void TryRecalculatePathToTarget()
+    public void TryRecalculatePathToTarget()
     {
         Grid.Tile startTile = Grid.Instance.GetClosest(transform.position);
         Grid.Tile targetTile = GetClosestBurgerTile() ?? Grid.Instance.GetFinishTile();
@@ -289,43 +239,36 @@ public class Kim : CharacterController
 
         if (currentPath == null || currentPath.Count == 0)
         {
-            Debug.LogError("No path found! Waiting for path to clear...");
-            isWaitingForPath = true; // Set waiting flag if no path is found
+            isWaitingForPath = true;
         }
         else
         {
-            isWaitingForPath = false; // Clear waiting flag if path is found
-            currentPathIndex = 0; // Reset the path index
+            isWaitingForPath = false;
+            currentPathIndex = 0;
         }
     }
 
-    // Retry pathfinding if Kim is waiting for a clear path
     private void ReattemptPathToTarget()
     {
-        Debug.Log("Reattempting path to target...");
         TryRecalculatePathToTarget();
     }
 
-    // Recalculate the path to the given target
     private void RecalculatePathToTarget(Grid.Tile targetTile)
     {
         Grid.Tile startTile = Grid.Instance.GetClosest(transform.position);
         currentPath = pathfinding.FindPath(startTile, targetTile);
-        currentPathIndex = 0; // Reset the path index
+        currentPathIndex = 0;
 
         if (currentPath != null && currentPath.Count > 0)
         {
-            Debug.Log("Recalculated path to target. Number of tiles: " + currentPath.Count);
-            isWaitingForPath = false; // Clear waiting flag
+            isWaitingForPath = false;
         }
         else
         {
-            Debug.LogError("No path found!");
-            isWaitingForPath = true; // Set waiting flag if no path is found
+            isWaitingForPath = true;
         }
     }
 
-    // Visualize the zones (Occupied: Red, Danger: Yellow)
     private void VisualizeZombieZones()
     {
         Collider[] hits = Physics.OverlapSphere(transform.position, ContextRadius);
@@ -336,7 +279,6 @@ public class Kim : CharacterController
             {
                 Grid.Tile zombieTile = Grid.Instance.GetClosest(hit.transform.position);
 
-                // Visualize the occupied zone (Red, 2 tiles)
                 for (int x = -2; x <= 2; x++)
                 {
                     for (int y = -2; y <= 2; y++)
@@ -350,7 +292,6 @@ public class Kim : CharacterController
                     }
                 }
 
-                // Visualize the danger zone (Yellow, 4 tiles)
                 for (int x = -4; x <= 4; x++)
                 {
                     for (int y = -4; y <= 4; y++)
