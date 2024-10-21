@@ -128,7 +128,6 @@ public class RecalculatePathAction : BehaviorNode
     }
 }
 
-
 // Node: Check if path is clear of obstacles
 public class IsPathClear : BehaviorNode
 {

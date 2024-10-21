@@ -31,8 +31,8 @@ public class Kim : CharacterController
     // Define the behavior tree nodes
     private BehaviorTree behaviorTree;
 
-    protected const float ReachDistThreshold = 0.1f;
-    protected const float CharacterMoveSpeed = 2.0f;
+    [SerializeField] protected float ReachDistThreshold = 0.2f;
+    [SerializeField] protected float CharacterMoveSpeed = 2.0f;
 
     public override void StartCharacter()
     {
@@ -78,12 +78,13 @@ public class Kim : CharacterController
         // Update the behavior tree every frame
         behaviorTree.Execute();
 
-        // Mark and visualize zombie zones
-        MarkAndVisualizeZombieZones();
-
         // Ensure Kim moves along the current path
-        MoveAlongPath();  // This ensures Kim moves every frame if a path is valid
+        if (!isWaitingForPath && currentPath != null && currentPathIndex < currentPath.Count)
+        {
+            MoveAlongPath();
+        }
     }
+
 
     private void SetPathToClosestBurger()
     {
@@ -111,6 +112,7 @@ public class Kim : CharacterController
         // Do not move if no valid path or Kim is waiting
         if (currentPath == null || currentPathIndex >= currentPath.Count || isWaitingForPath)
         {
+            Debug.Log("No valid path to follow or Kim is waiting.");
             return;
         }
 
@@ -140,9 +142,15 @@ public class Kim : CharacterController
 
         if (Vector3.Distance(transform.position, targetPosition) < ReachDistThreshold)
         {
-            transform.position = targetPosition;
+            transform.position = targetPosition; // Snap to the target position
             currentPathIndex++;
             Debug.Log($"Reached tile {currentPathIndex}, moving to the next tile...");
+
+            // If Kim has reached the end of the path, stop moving
+            if (currentPathIndex >= currentPath.Count)
+            {
+                Debug.Log("Reached the end of the path.");
+            }
         }
 
         // Visualize the path for debugging
@@ -153,7 +161,6 @@ public class Kim : CharacterController
             Debug.DrawLine(from, to, Color.red, 0.5f);
         }
     }
-
 
 
     private List<Grid.Tile> GetAllBurgerTiles()
@@ -206,7 +213,6 @@ public class Kim : CharacterController
             Debug.Log("Burger collected. Recalculating path to the next target...");
         }
     }
-
 
     private void ResetDynamicOccupiedTiles()
     {
@@ -272,8 +278,6 @@ public class Kim : CharacterController
         return zombieTiles;
     }
 
-
-
     public void TryRecalculatePathToTarget()
     {
         Grid.Tile startTile = Grid.Instance.GetClosest(transform.position);
@@ -290,6 +294,7 @@ public class Kim : CharacterController
         {
             isWaitingForPath = false;
             currentPathIndex = 0;  // Reset path index
+            Debug.Log("Path recalculated. Kim should start following the new path.");
 
             // Log the path for debugging
             Debug.Log($"Path recalculated. Number of tiles in path: {currentPath.Count}");
@@ -297,11 +302,11 @@ public class Kim : CharacterController
             {
                 Debug.Log($"Tile: {Grid.Instance.WorldPos(tile)}");
             }
+
+            // Ensure Kim moves along the path immediately
+            MoveAlongPath();
         }
     }
-
-
-
 
 
     private void ReattemptPathToTarget()
@@ -324,5 +329,4 @@ public class Kim : CharacterController
             isWaitingForPath = true;
         }
     }
-
 }
