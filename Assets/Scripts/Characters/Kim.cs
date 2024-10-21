@@ -80,6 +80,9 @@ public class Kim : CharacterController
 
         // Mark and visualize zombie zones
         MarkAndVisualizeZombieZones();
+
+        // Ensure Kim moves along the current path
+        MoveAlongPath();  // This ensures Kim moves every frame if a path is valid
     }
 
     private void SetPathToClosestBurger()
@@ -105,14 +108,18 @@ public class Kim : CharacterController
 
     public void MoveAlongPath()
     {
-        // Do not move if there is no valid path or if Kim is waiting for a path to clear
+        // Do not move if no valid path or Kim is waiting
         if (currentPath == null || currentPathIndex >= currentPath.Count || isWaitingForPath)
         {
-            return;  // Stop moving if no path is available or Kim is waiting
+            return;
         }
 
         Grid.Tile targetTile = currentPath[currentPathIndex];
         Vector3 targetPosition = Grid.Instance.WorldPos(targetTile);
+
+        // Log current and target positions for debugging
+        Debug.Log($"Kim's current position: {transform.position}");
+        Debug.Log($"Moving towards target position: {targetPosition}");
 
         Vector3 direction = (targetPosition - transform.position).normalized;
 
@@ -125,15 +132,20 @@ public class Kim : CharacterController
             direction = new Vector3(0, 0, Mathf.Sign(direction.z));
         }
 
+        // Move Kim toward the target tile
         transform.position += direction * CharacterMoveSpeed * Time.deltaTime;
+
+        // Log the distance to the target tile
+        Debug.Log($"Distance to target tile: {Vector3.Distance(transform.position, targetPosition)}");
 
         if (Vector3.Distance(transform.position, targetPosition) < ReachDistThreshold)
         {
             transform.position = targetPosition;
             currentPathIndex++;
+            Debug.Log($"Reached tile {currentPathIndex}, moving to the next tile...");
         }
 
-        // Visualize the path (optional debugging)
+        // Visualize the path for debugging
         for (int i = 0; i < currentPath.Count - 1; i++)
         {
             Vector3 from = Grid.Instance.WorldPos(currentPath[i]);
@@ -141,6 +153,8 @@ public class Kim : CharacterController
             Debug.DrawLine(from, to, Color.red, 0.5f);
         }
     }
+
+
 
     private List<Grid.Tile> GetAllBurgerTiles()
     {
@@ -269,18 +283,24 @@ public class Kim : CharacterController
 
         if (currentPath == null || currentPath.Count == 0)
         {
-            // No valid path found, so Kim should wait
             isWaitingForPath = true;
             Debug.Log("No path found. Kim is waiting...");
         }
         else
         {
-            // Valid path found, so Kim should follow the path
             isWaitingForPath = false;
-            currentPathIndex = 0;  // Reset path index so Kim can start following it
-            Debug.Log("Path recalculated. Kim is moving.");
+            currentPathIndex = 0;  // Reset path index
+
+            // Log the path for debugging
+            Debug.Log($"Path recalculated. Number of tiles in path: {currentPath.Count}");
+            foreach (var tile in currentPath)
+            {
+                Debug.Log($"Tile: {Grid.Instance.WorldPos(tile)}");
+            }
         }
     }
+
+
 
 
 
