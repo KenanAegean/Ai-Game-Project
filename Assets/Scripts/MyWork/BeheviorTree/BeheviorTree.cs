@@ -96,39 +96,30 @@ public class IsInDangerZone : BehaviorNode
 
     public override bool Execute()
     {
-        // Logic for checking if Kim is in a danger zone
         kim.MarkAndVisualizeZombieZones(); // Update danger zone status
         return kim.isInDangerZone;
     }
 }
 
-// Node: Recalculate the path when Kim is in danger
-public class RecalculatePathAction : BehaviorNode
+// Node: Recalculate the path to avoid danger zones
+public class RecalculatePathToAvoidDanger : BehaviorNode
 {
     private Kim kim;
 
-    public RecalculatePathAction(Kim kim)
+    public RecalculatePathToAvoidDanger(Kim kim)
     {
         this.kim = kim;
     }
 
     public override bool Execute()
     {
-        // Recalculate path if in danger zone
+        // Recalculate the path while avoiding the danger zone
         kim.TryRecalculatePathToTarget();
-
-        // If Kim is waiting for the path to clear, the action should indicate failure
-        if (kim.isWaitingForPath)
-        {
-            return false;  // Kim should wait for a clear path
-        }
-
-        // Otherwise, Kim can proceed with the new path
-        return true;
+        return !kim.isWaitingForPath; // Return true if Kim can follow the new path
     }
 }
 
-// Node: Check if path is clear of obstacles
+// Node: Check if the path is clear of obstacles
 public class IsPathClear : BehaviorNode
 {
     private Blackboard blackboard;
@@ -145,7 +136,7 @@ public class IsPathClear : BehaviorNode
     }
 }
 
-// Node: Move Kim to the closest burger
+// Node: Move Kim to the nearest burger or target
 public class MoveToBurgerAction : BehaviorNode
 {
     private Kim kim;
@@ -159,15 +150,35 @@ public class MoveToBurgerAction : BehaviorNode
 
     public override bool Execute()
     {
-        // Logic for moving towards the closest burger
-        var burgerTiles = blackboard.Get<List<Grid.Tile>>("burgers");
-
-        if (burgerTiles == null || burgerTiles.Count == 0)
-        {
-            return false; // No burgers left to collect
-        }
-
+        // Logic for moving towards the closest burger or target
         kim.MoveAlongPath(); // Continue moving along the current path
         return true;
+    }
+}
+
+// Node: Check if Kim needs to switch targets (from burgers to the finish line)
+public class CheckAndSwitchTarget : BehaviorNode
+{
+    private Kim kim;
+
+    public CheckAndSwitchTarget(Kim kim)
+    {
+        this.kim = kim;
+    }
+
+    public override bool Execute()
+    {
+        // Check if Kim has collected a burger and needs to find a new target
+        if (kim.AreBurgersLeft())
+        {
+            kim.SetPathToClosestBurger();
+            return true;
+        }
+        else
+        {
+            // If all burgers are collected, set the target to the finish line
+            kim.SetPathToFinishLine();
+            return true;
+        }
     }
 }
