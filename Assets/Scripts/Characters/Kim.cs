@@ -3,6 +3,8 @@ using UnityEngine;
 
 public class Kim : CharacterController
 {
+    [SerializeField] private float occupiedZoneRadius = 2.0f;  // Radius for the occupied zone around zombies
+    [SerializeField] private float dangerZoneRadius = 3.0f;    // Radius for the danger zone around zombies
     [SerializeField] float ContextRadius;
     private Pathfinding pathfinding;
     private List<Grid.Tile> currentPath;
@@ -18,7 +20,7 @@ public class Kim : CharacterController
     // Status flags
     public bool isInDangerZone = false;
     private bool wasInDangerZoneLastFrame = false;
-    private bool isWaitingForPath = false;
+    public bool isWaitingForPath = false;
 
     // Dynamic occupied tiles
     private List<Grid.Tile> dynamicOccupiedTiles = new List<Grid.Tile>();
@@ -76,30 +78,38 @@ public class Kim : CharacterController
         // Update the behavior tree every frame
         behaviorTree.Execute();
 
-        // Visualize occupied and danger zones
-        VisualizeZombieZones();
+        // Mark and visualize zombie zones
+        MarkAndVisualizeZombieZones();
     }
 
     private void SetPathToClosestBurger()
     {
+        // If there are no burgers left, set the path to the finish line
         if (burgerTiles.Count == 0)
         {
             Grid.Tile finishTile = Grid.Instance.GetFinishTile();
             RecalculatePathToTarget(finishTile);
+            Debug.Log("All burgers collected. Heading to the finish line...");
             return;
         }
 
+        // Set path to the closest burger
         Grid.Tile closestBurger = GetClosestBurgerTile();
         if (closestBurger != null)
         {
             RecalculatePathToTarget(closestBurger);
+            Debug.Log("Path set to the closest burger.");
         }
     }
 
+
     public void MoveAlongPath()
     {
-        if (currentPath == null || currentPathIndex >= currentPath.Count)
-            return;
+        // Do not move if there is no valid path or if Kim is waiting for a path to clear
+        if (currentPath == null || currentPathIndex >= currentPath.Count || isWaitingForPath)
+        {
+            return;  // Stop moving if no path is available or Kim is waiting
+        }
 
         Grid.Tile targetTile = currentPath[currentPathIndex];
         Vector3 targetPosition = Grid.Instance.WorldPos(targetTile);
@@ -123,6 +133,7 @@ public class Kim : CharacterController
             currentPathIndex++;
         }
 
+        // Visualize the path (optional debugging)
         for (int i = 0; i < currentPath.Count - 1; i++)
         {
             Vector3 from = Grid.Instance.WorldPos(currentPath[i]);
@@ -173,10 +184,15 @@ public class Kim : CharacterController
 
         if (burgerTiles.Contains(currentTile))
         {
+            // Remove the collected burger from the list
             burgerTiles.Remove(currentTile);
+
+            // Recalculate path to the next burger or the finish line
             SetPathToClosestBurger();
+            Debug.Log("Burger collected. Recalculating path to the next target...");
         }
     }
+
 
     private void ResetDynamicOccupiedTiles()
     {
@@ -187,7 +203,7 @@ public class Kim : CharacterController
         dynamicOccupiedTiles.Clear();
     }
 
-    public List<Grid.Tile> MarkDynamicZombieZones()
+    public List<Grid.Tile> MarkAndVisualizeZombieZones()
     {
         List<Grid.Tile> zombieTiles = new List<Grid.Tile>();
         Collider[] hits = Physics.OverlapSphere(transform.position, ContextRadius);
@@ -200,27 +216,39 @@ public class Kim : CharacterController
             {
                 Grid.Tile zombieTile = Grid.Instance.GetClosest(hit.transform.position);
 
-                for (int x = -2; x <= 2; x++)
+                // Mark and visualize the occupied zone (adjustable via Unity Inspector)
+                for (int x = -(int)occupiedZoneRadius; x <= (int)occupiedZoneRadius; x++)
                 {
-                    for (int y = -2; y <= 2; y++)
+                    for (int y = -(int)occupiedZoneRadius; y <= (int)occupiedZoneRadius; y++)
                     {
                         Grid.Tile nearbyTile = Grid.Instance.TryGetTile(new Vector2Int(zombieTile.x + x, zombieTile.y + y));
                         if (nearbyTile != null && !nearbyTile.occupied)
                         {
+                            // Mark tile as occupied
                             nearbyTile.occupied = true;
-                            dynamicOccupiedTiles.Add(nearbyTile);
+                            dynamicOccupiedTiles.Add(nearbyTile); // Track dynamic occupied tiles
+
+                            // Visualize the occupied zone (red)
+                            Vector3 tilePosition = Grid.Instance.WorldPos(nearbyTile);
+                            Debug.DrawLine(tilePosition, tilePosition + Vector3.up * 2, Color.red);
                         }
                     }
                 }
 
-                for (int x = -3; x <= 3; x++)
+                // Mark and visualize the danger zone (adjustable via Unity Inspector)
+                for (int x = -(int)dangerZoneRadius; x <= (int)dangerZoneRadius; x++)
                 {
-                    for (int y = -3; y <= 3; y++)
+                    for (int y = -(int)dangerZoneRadius; y <= (int)dangerZoneRadius; y++)
                     {
                         Grid.Tile dangerTile = Grid.Instance.TryGetTile(new Vector2Int(zombieTile.x + x, zombieTile.y + y));
-                        if (dangerTile != null && Vector3.Distance(Grid.Instance.WorldPos(dangerTile), transform.position) <= 4)
+                        if (dangerTile != null && Vector3.Distance(Grid.Instance.WorldPos(dangerTile), transform.position) <= dangerZoneRadius)
                         {
+                            // Mark Kim as being in the danger zone
                             isInDangerZone = true;
+
+                            // Visualize the danger zone (yellow)
+                            Vector3 tilePosition = Grid.Instance.WorldPos(dangerTile);
+                            Debug.DrawLine(tilePosition, tilePosition + Vector3.up * 2, Color.yellow);
                         }
                     }
                 }
@@ -229,6 +257,8 @@ public class Kim : CharacterController
 
         return zombieTiles;
     }
+
+
 
     public void TryRecalculatePathToTarget()
     {
@@ -239,14 +269,20 @@ public class Kim : CharacterController
 
         if (currentPath == null || currentPath.Count == 0)
         {
+            // No valid path found, so Kim should wait
             isWaitingForPath = true;
+            Debug.Log("No path found. Kim is waiting...");
         }
         else
         {
+            // Valid path found, so Kim should follow the path
             isWaitingForPath = false;
-            currentPathIndex = 0;
+            currentPathIndex = 0;  // Reset path index so Kim can start following it
+            Debug.Log("Path recalculated. Kim is moving.");
         }
     }
+
+
 
     private void ReattemptPathToTarget()
     {
@@ -269,42 +305,4 @@ public class Kim : CharacterController
         }
     }
 
-    private void VisualizeZombieZones()
-    {
-        Collider[] hits = Physics.OverlapSphere(transform.position, ContextRadius);
-
-        foreach (Collider hit in hits)
-        {
-            if (hit.CompareTag("Zombie"))
-            {
-                Grid.Tile zombieTile = Grid.Instance.GetClosest(hit.transform.position);
-
-                for (int x = -2; x <= 2; x++)
-                {
-                    for (int y = -2; y <= 2; y++)
-                    {
-                        Grid.Tile occupiedTile = Grid.Instance.TryGetTile(new Vector2Int(zombieTile.x + x, zombieTile.y + y));
-                        if (occupiedTile != null)
-                        {
-                            Vector3 tilePosition = Grid.Instance.WorldPos(occupiedTile);
-                            Debug.DrawLine(tilePosition, tilePosition + Vector3.up * 2, Color.red);
-                        }
-                    }
-                }
-
-                for (int x = -4; x <= 4; x++)
-                {
-                    for (int y = -4; y <= 4; y++)
-                    {
-                        Grid.Tile dangerTile = Grid.Instance.TryGetTile(new Vector2Int(zombieTile.x + x, zombieTile.y + y));
-                        if (dangerTile != null)
-                        {
-                            Vector3 tilePosition = Grid.Instance.WorldPos(dangerTile);
-                            Debug.DrawLine(tilePosition, tilePosition + Vector3.up * 2, Color.yellow);
-                        }
-                    }
-                }
-            }
-        }
-    }
 }

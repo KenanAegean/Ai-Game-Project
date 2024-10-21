@@ -97,7 +97,7 @@ public class IsInDangerZone : BehaviorNode
     public override bool Execute()
     {
         // Logic for checking if Kim is in a danger zone
-        kim.MarkDynamicZombieZones(); // Update danger zone status
+        kim.MarkAndVisualizeZombieZones(); // Update danger zone status
         return kim.isInDangerZone;
     }
 }
@@ -114,11 +114,20 @@ public class RecalculatePathAction : BehaviorNode
 
     public override bool Execute()
     {
-        // Logic for recalculating the path when in danger
+        // Recalculate path if in danger zone
         kim.TryRecalculatePathToTarget();
-        return true; // Always return true since this action will always be attempted
+
+        // If Kim is waiting for the path to clear, the action should indicate failure
+        if (kim.isWaitingForPath)
+        {
+            return false;  // Kim should wait for a clear path
+        }
+
+        // Otherwise, Kim can proceed with the new path
+        return true;
     }
 }
+
 
 // Node: Check if path is clear of obstacles
 public class IsPathClear : BehaviorNode
