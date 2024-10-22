@@ -139,46 +139,59 @@ public class Kim : CharacterController
             isWaitingForPath = false;
             currentPathIndex = 0;
 
+            // Log the recalculated path
+            Debug.Log("Recalculated path:");
+            foreach (var tile in currentPath)
+            {
+                Debug.Log($"Tile at ({tile.x}, {tile.y})");
+            }
+
             // Set walk buffer using the newly calculated path
             SetWalkBuffer(currentPath);
             Debug.Log("Kim's path recalculated. Starting movement.");
         }
     }
 
+
     // Move along the current path
     public void MoveAlongPath()
     {
+        // Ensure there's a valid path and that Kim is not waiting
         if (currentPath == null || currentPathIndex >= currentPath.Count || isWaitingForPath)
+        {
+            Debug.LogWarning("No valid path or Kim is waiting.");
             return;
+        }
 
+        // Get the current target tile
         Grid.Tile targetTile = currentPath[currentPathIndex];
         Vector3 targetPosition = Grid.Instance.WorldPos(targetTile);
 
-        // Debug target position to ensure we're moving towards a valid point
-        Debug.Log($"Moving towards target position: {targetPosition}");
+        // Check if Kim is already at the target position
+        float distanceToTarget = Vector3.Distance(transform.position, targetPosition);
+        if (distanceToTarget < ReachDistThreshold)
+        {
+            // Kim is close enough to the target, move to the next tile
+            currentPathIndex++;
+            Debug.Log($"Reached tile {currentPathIndex}, moving to the next tile...");
+            return;  // Skip further movement calculations and go to the next tile
+        }
 
+        // Calculate the direction vector
         Vector3 direction = (targetPosition - transform.position).normalized;
 
-        // Debug direction vector
+        // Debug target position and direction vector
+        Debug.Log($"Moving towards target position: {targetPosition}");
         Debug.Log($"Direction vector: {direction}");
 
-        // Ensure direction is valid before moving
-        if (direction.magnitude > 0.001f)
+        // Check if the direction vector has a valid magnitude before moving
+        if (direction.magnitude > 0.01f)  // Slightly higher threshold to ensure movement happens
         {
+            // Move Kim towards the target tile
             transform.position += direction * CharacterMoveSpeed * Time.deltaTime;
-            float distanceToTarget = Vector3.Distance(transform.position, targetPosition);
 
             // Debug distance to target
             Debug.Log($"Distance to target: {distanceToTarget}");
-
-            // If the distance to the target is small enough, we consider the target "reached"
-            if (distanceToTarget < ReachDistThreshold)
-            {
-                // Snap Kim to the target position and move to the next tile
-                transform.position = targetPosition;
-                currentPathIndex++;
-                Debug.Log($"Reached tile {currentPathIndex}, moving to the next tile...");
-            }
         }
         else
         {
@@ -188,6 +201,9 @@ public class Kim : CharacterController
         // Visualize the path
         VisualizePath();
     }
+
+
+
 
     // Visualize the path
     private void VisualizePath()
