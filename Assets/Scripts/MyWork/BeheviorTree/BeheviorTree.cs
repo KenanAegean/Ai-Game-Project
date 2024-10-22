@@ -1,7 +1,7 @@
-using System.Collections.Generic;
-using UnityEngine;
-
 // Behavior Tree Base Classes
+using System.Collections.Generic;
+using UnityEditor.Experimental.GraphView;
+
 public abstract class BehaviorNode
 {
     public abstract bool Execute();
@@ -45,7 +45,6 @@ public class Sequence : BehaviorNode
     }
 }
 
-// Behavior Tree Manager
 public class BehaviorTree
 {
     private BehaviorNode rootNode;
@@ -61,34 +60,11 @@ public class BehaviorTree
     }
 }
 
-// Blackboard Class for shared memory between nodes
-public class Blackboard
-{
-    private Dictionary<string, object> data = new Dictionary<string, object>();
-
-    public void Set(string key, object value)
-    {
-        data[key] = value;
-    }
-
-    public T Get<T>(string key)
-    {
-        if (data.ContainsKey(key))
-        {
-            return (T)data[key];
-        }
-        return default;
-    }
-}
-
-// Behavior Nodes
-
 // Node: Check if Kim is in a danger zone
 public class IsInDangerZone : BehaviorNode
 {
     private Kim kim;
 
-    // Adjusted constructor to take only Kim
     public IsInDangerZone(Kim kim)
     {
         this.kim = kim;
@@ -168,17 +144,22 @@ public class CheckAndSwitchTarget : BehaviorNode
 
     public override bool Execute()
     {
-        // Check if Kim has collected all burgers
-        if (kim.AreBurgersLeft())
+        // Check if Kim has collected a burger
+        kim.CheckIfCollectedBurger();
+
+        if (kim.hasCollectedBurger)
         {
-            kim.SetPathToClosestBurger();
+            kim.SetPathToClosestBurger(); // Set the next target
+            kim.hasCollectedBurger = false; // Reset the flag
             return true;
         }
-        else
+        else if (!kim.AreBurgersLeft())
         {
-            // If all burgers are collected, set the path to the finish line
+            // If all burgers are collected, set the target to the finish line
             kim.SetPathToFinishLine();
             return true;
         }
+
+        return false;
     }
 }

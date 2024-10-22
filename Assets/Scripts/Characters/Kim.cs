@@ -17,6 +17,7 @@ public class Kim : CharacterController
     // Status flags
     public bool isInDangerZone = false;
     public bool isWaitingForPath = false;
+    public bool hasCollectedBurger = false;
 
     // Zombie-related zones
     private List<Grid.Tile> dynamicOccupiedTiles = new List<Grid.Tile>();
@@ -27,8 +28,8 @@ public class Kim : CharacterController
     // Behavior tree
     private BehaviorTree behaviorTree;
 
-    // Add CharacterMoveSpeed as a constant
-    protected const float CharacterMoveSpeed = 2.0f;
+    // Movement speed
+    protected const float CharacterMoveSpeed = 1.0f;
 
     public override void StartCharacter()
     {
@@ -64,7 +65,7 @@ public class Kim : CharacterController
 
         // Set the initial path to the nearest burger and start moving
         SetPathToClosestBurger();
-        MoveAlongPath();
+        MoveAlongPath();  // Start moving immediately after setting the path
     }
 
     public override void UpdateCharacter()
@@ -133,7 +134,10 @@ public class Kim : CharacterController
         {
             isWaitingForPath = false;
             currentPathIndex = 0;
-            MoveAlongPath();  // Ensure movement starts after recalculating the path
+
+            // Set walk buffer using the newly calculated path
+            SetWalkBuffer(currentPath);
+            Debug.Log("Kim's path recalculated. Starting movement.");
         }
     }
 
@@ -146,22 +150,35 @@ public class Kim : CharacterController
         Grid.Tile targetTile = currentPath[currentPathIndex];
         Vector3 targetPosition = Grid.Instance.WorldPos(targetTile);
 
+        // Debug target position to ensure we're moving towards a valid point
+        Debug.Log($"Moving towards target position: {targetPosition}");
+
         Vector3 direction = (targetPosition - transform.position).normalized;
 
-        //Debug.Log($"direction.magnitude {direction.magnitude} ");
+        // Debug direction vector
+        Debug.Log($"Direction vector: {direction}");
+
         // Ensure direction is valid before moving
-        if (direction.magnitude > 0.00001f)
+        if (direction.magnitude > 0.001f)
         {
-            // Use parent logic for movement and ensure buffer is updated correctly
-            myWalkBuffer.Clear();
-            myWalkBuffer.AddRange(currentPath);
-            Debug.Log($"Setting walk buffer with {myWalkBuffer.Count} tiles.");
-            Debug.Log($"direction.magnitude {direction.magnitude} ");
+            transform.position += direction * CharacterMoveSpeed * Time.deltaTime;
+            float distanceToTarget = Vector3.Distance(transform.position, targetPosition);
+
+            // Debug distance to target
+            Debug.Log($"Distance to target: {distanceToTarget}");
+
+            // If the distance to the target is small enough, we consider the target "reached"
+            if (distanceToTarget < ReachDistThreshold)
+            {
+                // Snap Kim to the target position and move to the next tile
+                transform.position = targetPosition;
+                currentPathIndex++;
+                Debug.Log($"Reached tile {currentPathIndex}, moving to the next tile...");
+            }
         }
         else
         {
             Debug.LogWarning("Movement direction is zero. No movement.");
-            Debug.Log($"direction.magnitude {direction.magnitude} ");
         }
 
         // Visualize the path
@@ -215,6 +232,19 @@ public class Kim : CharacterController
         }
 
         return closestBurgerTile;
+    }
+
+    // Check if Kim collected a burger
+    public void CheckIfCollectedBurger()
+    {
+        Grid.Tile currentTile = Grid.Instance.GetClosest(transform.position);
+        if (burgerTiles.Contains(currentTile))
+        {
+            // Remove the collected burger
+            burgerTiles.Remove(currentTile);
+            hasCollectedBurger = true;
+            Debug.Log("Kim collected a burger.");
+        }
     }
 
     // Reset dynamic occupied tiles after each frame
