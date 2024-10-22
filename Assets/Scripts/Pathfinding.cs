@@ -81,8 +81,6 @@ public class Pathfinding
         return neighbors;
     }
 
-
-
     // Heuristic function (Manhattan distance for grid movement)
     private int GetHeuristic(Grid.Tile a, Grid.Tile b)
     {

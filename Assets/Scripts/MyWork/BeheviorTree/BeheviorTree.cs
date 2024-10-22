@@ -45,6 +45,7 @@ public class Sequence : BehaviorNode
     }
 }
 
+// Behavior Tree Manager
 public class BehaviorTree
 {
     private BehaviorNode rootNode;
@@ -60,7 +61,7 @@ public class BehaviorTree
     }
 }
 
-// Blackboard Class
+// Blackboard Class for shared memory between nodes
 public class Blackboard
 {
     private Dictionary<string, object> data = new Dictionary<string, object>();
@@ -85,12 +86,11 @@ public class Blackboard
 // Node: Check if Kim is in a danger zone
 public class IsInDangerZone : BehaviorNode
 {
-    private Blackboard blackboard;
     private Kim kim;
 
-    public IsInDangerZone(Blackboard blackboard, Kim kim)
+    // Adjusted constructor to take only Kim
+    public IsInDangerZone(Kim kim)
     {
-        this.blackboard = blackboard;
         this.kim = kim;
     }
 
@@ -114,7 +114,7 @@ public class RecalculatePathToAvoidDanger : BehaviorNode
     public override bool Execute()
     {
         // Recalculate the path while avoiding the danger zone
-        kim.TryRecalculatePathToTarget();
+        kim.RecalculatePath(kim.GetClosestBurgerTile() ?? kim.finishTile); // Recalculate path to avoid danger
         return !kim.isWaitingForPath; // Return true if Kim can follow the new path
     }
 }
@@ -131,8 +131,8 @@ public class IsPathClear : BehaviorNode
 
     public override bool Execute()
     {
-        // Logic to determine if the path is clear of zombies or obstacles
-        return true; // For now, assume the path is clear. Modify as needed.
+        // Assume the path is clear. You can add additional logic here later if needed.
+        return true;
     }
 }
 
@@ -168,7 +168,7 @@ public class CheckAndSwitchTarget : BehaviorNode
 
     public override bool Execute()
     {
-        // Check if Kim has collected a burger and needs to find a new target
+        // Check if Kim has collected all burgers
         if (kim.AreBurgersLeft())
         {
             kim.SetPathToClosestBurger();
@@ -176,7 +176,7 @@ public class CheckAndSwitchTarget : BehaviorNode
         }
         else
         {
-            // If all burgers are collected, set the target to the finish line
+            // If all burgers are collected, set the path to the finish line
             kim.SetPathToFinishLine();
             return true;
         }
