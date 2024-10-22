@@ -63,6 +63,7 @@ public class Kim : CharacterController
             )
         );
 
+
         // Set the initial path to the nearest burger and start moving
         SetPathToClosestBurger();
         MoveAlongPath();  // Start moving immediately after setting the path
@@ -74,6 +75,9 @@ public class Kim : CharacterController
 
         // Clear any previous dynamic occupied zones
         ResetDynamicOccupiedTiles();
+
+        // Call this function every frame to update zombie zones
+        MarkAndVisualizeZombieZones();
 
         // Execute the behavior tree
         behaviorTree.Execute();
@@ -262,23 +266,37 @@ public class Kim : CharacterController
     {
         Collider[] hits = Physics.OverlapSphere(transform.position, contextRadius);
 
-        isInDangerZone = false;
+        isInDangerZone = false;  // Reset the danger zone flag
+
+        Debug.Log("Checking for zombies...");
 
         foreach (Collider hit in hits)
         {
             if (hit.CompareTag("Zombie"))
             {
+                Debug.Log("Zombie detected!");
+
                 Grid.Tile zombieTile = Grid.Instance.GetClosest(hit.transform.position);
 
                 // Mark and visualize occupied and danger zones
                 MarkZombieZones(zombieTile);
             }
         }
+
+        if (isInDangerZone)
+        {
+            Debug.Log("Kim is in the danger zone!");
+        }
+        else
+        {
+            Debug.Log("Kim is safe.");
+        }
     }
 
-    // Mark and visualize the zones around zombies
     private void MarkZombieZones(Grid.Tile zombieTile)
     {
+        Debug.Log("Marking zombie zones...");
+
         // Occupied zone (red)
         for (int x = -(int)occupiedZoneRadius; x <= (int)occupiedZoneRadius; x++)
         {
@@ -287,9 +305,12 @@ public class Kim : CharacterController
                 Grid.Tile nearbyTile = Grid.Instance.TryGetTile(new Vector2Int(zombieTile.x + x, zombieTile.y + y));
                 if (nearbyTile != null && !nearbyTile.occupied)
                 {
+                    // Mark tile as occupied
                     nearbyTile.occupied = true;
                     dynamicOccupiedTiles.Add(nearbyTile);
                     Debug.DrawLine(Grid.Instance.WorldPos(nearbyTile), Grid.Instance.WorldPos(nearbyTile) + Vector3.up * 2, Color.red);
+
+                    Debug.Log($"Occupied tile marked at {nearbyTile.x}, {nearbyTile.y}");
                 }
             }
         }
@@ -302,10 +323,14 @@ public class Kim : CharacterController
                 Grid.Tile dangerTile = Grid.Instance.TryGetTile(new Vector2Int(zombieTile.x + x, zombieTile.y + y));
                 if (dangerTile != null && Vector3.Distance(Grid.Instance.WorldPos(dangerTile), transform.position) <= dangerZoneRadius)
                 {
+                    // Mark Kim as being in the danger zone
                     isInDangerZone = true;
                     Debug.DrawLine(Grid.Instance.WorldPos(dangerTile), Grid.Instance.WorldPos(dangerTile) + Vector3.up * 2, Color.yellow);
+
+                    Debug.Log($"Danger tile marked at {dangerTile.x}, {dangerTile.y}");
                 }
             }
         }
     }
+
 }

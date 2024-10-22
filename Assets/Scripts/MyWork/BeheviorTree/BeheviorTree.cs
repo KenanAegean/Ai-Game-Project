@@ -1,4 +1,4 @@
-// Behavior Tree Base Classes
+using UnityEngine;
 using System.Collections.Generic;
 using UnityEditor.Experimental.GraphView;
 
@@ -72,10 +72,23 @@ public class IsInDangerZone : BehaviorNode
 
     public override bool Execute()
     {
+        Debug.Log("Checking if Kim is in a danger zone...");
+
         kim.MarkAndVisualizeZombieZones(); // Update danger zone status
-        return kim.isInDangerZone;
+
+        if (kim.isInDangerZone)
+        {
+            Debug.Log("Kim is in a danger zone. Recalculating path...");
+            return true;
+        }
+        else
+        {
+            Debug.Log("Kim is not in a danger zone.");
+            return false;
+        }
     }
 }
+
 
 // Node: Recalculate the path to avoid danger zones
 public class RecalculatePathToAvoidDanger : BehaviorNode
