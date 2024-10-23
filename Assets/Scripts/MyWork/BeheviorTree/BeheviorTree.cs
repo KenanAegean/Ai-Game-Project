@@ -59,53 +59,6 @@ public class BehaviorTree
     }
 }
 
-// Node: Check if Kim is near an occupied zone (previously "IsInDangerZone")
-public class IsCloseToOccupiedZone : BehaviorNode
-{
-    private Kim kim;
-
-    public IsCloseToOccupiedZone(Kim kim)
-    {
-        this.kim = kim;
-    }
-
-    public override bool Execute()
-    {
-        Debug.Log("Checking if Kim is close to an occupied zone...");
-
-        kim.MarkAndVisualizeZombieZones(); // Update occupied zone status
-
-        if (kim.isInDangerZone)  // Here "isInDangerZone" refers to being close to occupied zones
-        {
-            Debug.Log("Kim is close to an occupied zone. Recalculating path...");
-            return true;
-        }
-        else
-        {
-            Debug.Log("Kim is not near any occupied zones.");
-            return false;
-        }
-    }
-}
-
-// Node: Recalculate the path to avoid occupied zones
-public class RecalculatePathToAvoidOccupiedZones : BehaviorNode
-{
-    private Kim kim;
-
-    public RecalculatePathToAvoidOccupiedZones(Kim kim)
-    {
-        this.kim = kim;
-    }
-
-    public override bool Execute()
-    {
-        // Recalculate the path avoiding the occupied zones
-        kim.RecalculatePath(null, true); // Pass true to avoid occupied zones
-        return !kim.isWaitingForPath; // Return true if Kim can follow the new path
-    }
-}
-
 // Node: Retry movement if Kim is stuck
 public class RetryMovementIfStuck : BehaviorNode
 {

@@ -10,7 +10,7 @@ public class Pathfinding
         this.grid = grid;
     }
 
-    public List<Grid.Tile> FindPath(Grid.Tile startTile, Grid.Tile targetTile, bool avoidDanger = false, List<Grid.Tile> dangerTiles = null)
+    public List<Grid.Tile> FindPath(Grid.Tile startTile, Grid.Tile targetTile)
     {
         List<Grid.Tile> openSet = new List<Grid.Tile> { startTile };
         HashSet<Grid.Tile> closedSet = new HashSet<Grid.Tile>();
@@ -39,12 +39,6 @@ public class Pathfinding
                 if (closedSet.Contains(neighbor) || neighbor.occupied) // Skip occupied tiles or already processed ones
                 {
                     continue;
-                }
-
-                // Avoid danger zones if enabled
-                if (avoidDanger && IsTileInDangerZone(neighbor, dangerTiles))
-                {
-                    continue;  // Skip tiles that are in danger zones
                 }
 
                 int tentativeGScore = gScore[currentTile] + 1; // Distance between adjacent tiles is always 1

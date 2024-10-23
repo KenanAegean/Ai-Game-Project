@@ -3,8 +3,6 @@ using UnityEngine;
 
 public class Kim : CharacterController
 {
-    [SerializeField] private float occupiedZoneRadius = 2.0f;
-    //[SerializeField] private float dangerZoneRadius = 3.0f;
     [SerializeField] float contextRadius;
     private Pathfinding pathfinding;
     private List<Grid.Tile> currentPath;
@@ -15,12 +13,9 @@ public class Kim : CharacterController
     public Grid.Tile finishTile { get; private set; }
 
     // Status flags
-    public bool isInDangerZone = false;
     public bool isWaitingForPath = false;
     public bool hasCollectedBurger = false;
 
-    // Zombie-related zones
-    private List<Grid.Tile> dynamicOccupiedTiles = new List<Grid.Tile>();
 
     // Blackboard for the behavior tree
     private Blackboard blackboard = new Blackboard();
@@ -50,11 +45,7 @@ public class Kim : CharacterController
 
         // Initialize the behavior tree
         behaviorTree = new BehaviorTree(
-            new Selector(
-                new Sequence(
-                    new IsCloseToOccupiedZone(this),   // Check if Kim is near an occupied zone
-                    new RecalculatePathToAvoidOccupiedZones(this)  // Recalculate path avoiding occupied zones
-                ),
+            new Selector(    
                 new Sequence(
                     new IsPathClear(), // Assuming path is always clear for now
                     new MoveToBurgerAction(this),  // Move Kim towards the closest burger
@@ -75,12 +66,6 @@ public class Kim : CharacterController
     public override void UpdateCharacter()
     {
         base.UpdateCharacter();
-
-        // Clear any previous dynamic occupied zones
-        ResetDynamicOccupiedTiles();
-
-        // Call this function every frame to update zombie zones
-        MarkAndVisualizeZombieZones();
 
         // Execute the behavior tree
         behaviorTree.Execute();
@@ -137,11 +122,8 @@ public class Kim : CharacterController
 
         Grid.Tile startTile = Grid.Instance.GetClosest(transform.position);
 
-        // Pass the occupied tiles list if avoiding occupied zones
-        List<Grid.Tile> tilesToAvoid = avoidOccupied ? dynamicOccupiedTiles : null;
-
         // Recalculate the path using dynamicOccupiedTiles when avoiding the occupied zone
-        currentPath = pathfinding.FindPath(startTile, targetTile, avoidOccupied, tilesToAvoid);
+        currentPath = pathfinding.FindPath(startTile, targetTile);
 
         if (currentPath == null || currentPath.Count == 0)
         {
@@ -250,9 +232,6 @@ public class Kim : CharacterController
 
 
 
-
-
-
     // Visualize the path
     private void VisualizePath()
     {
@@ -317,93 +296,6 @@ public class Kim : CharacterController
             SetPathToClosestBurger();
         }
     }
-
-
-    // Reset dynamic occupied tiles after each frame
-    public void MarkAndVisualizeZombieZones()
-    {
-        Collider[] hits = Physics.OverlapSphere(transform.position, contextRadius);
-
-        bool isKimCloseToOccupiedZone = false;  // Reset the close-to-occupied-zone flag
-
-        // Clear previous dynamic occupied tiles before marking again
-        ResetDynamicOccupiedTiles();
-
-        foreach (Collider hit in hits)
-        {
-            if (hit.CompareTag("Zombie"))
-            {
-                Grid.Tile zombieTile = Grid.Instance.GetClosest(hit.transform.position);
-
-                // Mark and visualize occupied zones (red)
-                MarkZombieZones(zombieTile);  // Handles marking the occupied zones
-
-                // Check if Kim is near an occupied zone
-                isKimCloseToOccupiedZone = IsKimNearOccupiedZone();
-            }
-        }
-
-        if (isKimCloseToOccupiedZone)
-        {
-            Debug.Log("Kim is close to an occupied zone! Recalculating path to avoid occupied zones.");
-            RecalculatePath(null, true); // Recalculate path avoiding occupied zones
-        }
-        else
-        {
-            Debug.Log("Kim is safe and not near any occupied zone.");
-        }
-    }
-
-    // Mark and visualize the zones around zombies (only occupied zones)
-    private void MarkZombieZones(Grid.Tile zombieTile)
-    {
-        // Occupied zone (red)
-        for (int x = -(int)occupiedZoneRadius; x <= (int)occupiedZoneRadius; x++)
-        {
-            for (int y = -(int)occupiedZoneRadius; y <= (int)occupiedZoneRadius; y++)
-            {
-                Grid.Tile nearbyTile = Grid.Instance.TryGetTile(new Vector2Int(zombieTile.x + x, zombieTile.y + y));
-                if (nearbyTile != null && !nearbyTile.occupied)
-                {
-                    // Mark tile as occupied
-                    nearbyTile.occupied = true;
-                    dynamicOccupiedTiles.Add(nearbyTile);
-                    Debug.DrawLine(Grid.Instance.WorldPos(nearbyTile), Grid.Instance.WorldPos(nearbyTile) + Vector3.up * 2, Color.red);
-                }
-            }
-        }
-    }
-
-    // Check if Kim is near any occupied zone
-    private bool IsKimNearOccupiedZone()
-    {
-        Grid.Tile currentTile = Grid.Instance.GetClosest(transform.position);
-
-        foreach (Grid.Tile occupiedTile in dynamicOccupiedTiles)
-        {
-            // If Kim is within a tile or two from any occupied zone, she should avoid it
-            if (Vector3.Distance(Grid.Instance.WorldPos(currentTile), Grid.Instance.WorldPos(occupiedTile)) <= occupiedZoneRadius)
-            {
-                Debug.Log("Kim is close to an occupied zone!");
-                return true;
-            }
-        }
-
-        return false;  // Kim is not near any occupied zones
-    }
-
-    // Clear dynamic occupied tiles after recalculating zones
-    private void ResetDynamicOccupiedTiles()
-    {
-        foreach (var tile in dynamicOccupiedTiles)
-        {
-            tile.occupied = false;
-        }
-        dynamicOccupiedTiles.Clear();
-    }
-
-
-
 
 }
 
