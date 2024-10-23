@@ -142,17 +142,16 @@ public class Kim : CharacterController
 
         Grid.Tile startTile = Grid.Instance.GetClosest(transform.position);
 
+        // Find the nearest tile on the current path to smooth the transition
+        if (currentPath != null && currentPath.Count > 0)
+        {
+            startTile = FindClosestTileOnCurrentPath();
+        }
+
         // Clear the current path before recalculating
         if (currentPath != null)
         {
             currentPath.Clear();  // Ensures no leftover path data is present
-        }
-
-        // Check if occupiedZones is null
-        if (occupiedZones == null)
-        {
-            Debug.LogError("OccupiedZones not found!");
-            return; // Exit early if occupiedZones is null
         }
 
         // Get the danger tiles from the occupied zones system
@@ -185,6 +184,27 @@ public class Kim : CharacterController
             SetWalkBuffer(currentPath);  // This will handle clearing the buffer
             Debug.Log("Kim's path recalculated. Starting movement.");
         }
+    }
+
+    // Helper function to find the closest tile on the current path to smooth transition
+    private Grid.Tile FindClosestTileOnCurrentPath()
+    {
+        Grid.Tile closestTile = null;
+        float shortestDistance = float.MaxValue;
+
+        for (int i = currentPathIndex; i < currentPath.Count; i++)
+        {
+            Grid.Tile pathTile = currentPath[i];
+            float distance = Vector3.Distance(transform.position, Grid.Instance.WorldPos(pathTile));
+
+            if (distance < shortestDistance)
+            {
+                shortestDistance = distance;
+                closestTile = pathTile;
+            }
+        }
+
+        return closestTile != null ? closestTile : Grid.Instance.GetClosest(transform.position);
     }
 
 
