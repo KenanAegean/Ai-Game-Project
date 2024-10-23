@@ -124,10 +124,18 @@ public class Kim : CharacterController
     }
 
     // Recalculate the path to a target
-    public void RecalculatePath(Grid.Tile targetTile)
+    public void RecalculatePath(Grid.Tile targetTile = null, bool avoidDanger = false)
     {
+        // If no target is provided, use the closest burger or finish line
+        if (targetTile == null)
+        {
+            targetTile = GetClosestBurgerTile() ?? finishTile;
+        }
+
         Grid.Tile startTile = Grid.Instance.GetClosest(transform.position);
-        currentPath = pathfinding.FindPath(startTile, targetTile);
+
+        // Pass the danger zone radius if avoidDanger is true
+        currentPath = pathfinding.FindPath(startTile, targetTile, avoidDanger, dangerZoneRadius);
 
         if (currentPath == null || currentPath.Count == 0)
         {
@@ -151,6 +159,9 @@ public class Kim : CharacterController
             Debug.Log("Kim's path recalculated. Starting movement.");
         }
     }
+
+
+
 
 
     // Move along the current path
@@ -276,6 +287,7 @@ public class Kim : CharacterController
         }
         dynamicOccupiedTiles.Clear();
     }
+
 
     // Mark and visualize the zombie zones
     public void MarkAndVisualizeZombieZones()

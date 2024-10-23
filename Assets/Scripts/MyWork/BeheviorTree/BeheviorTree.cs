@@ -102,11 +102,17 @@ public class RecalculatePathToAvoidDanger : BehaviorNode
 
     public override bool Execute()
     {
-        // Recalculate the path while avoiding the danger zone
-        kim.RecalculatePath(kim.GetClosestBurgerTile() ?? kim.finishTile); // Recalculate path to avoid danger
-        return !kim.isWaitingForPath; // Return true if Kim can follow the new path
+        if (kim.isInDangerZone)
+        {
+            Debug.Log("Kim is in a danger zone. Recalculating path...");
+            kim.RecalculatePath(null, true);  // Pass true to avoid danger zones
+            return !kim.isWaitingForPath;
+        }
+        return true;
     }
 }
+
+
 
 // Node: Check if the path is clear of obstacles
 public class IsPathClear : BehaviorNode

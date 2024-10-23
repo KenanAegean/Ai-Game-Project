@@ -10,7 +10,7 @@ public class Pathfinding
         this.grid = grid;
     }
 
-    public List<Grid.Tile> FindPath(Grid.Tile startTile, Grid.Tile targetTile)
+    public List<Grid.Tile> FindPath(Grid.Tile startTile, Grid.Tile targetTile, bool avoidDangerZones = false, float dangerZoneRadius = 0f)
     {
         List<Grid.Tile> openSet = new List<Grid.Tile> { startTile };
         HashSet<Grid.Tile> closedSet = new HashSet<Grid.Tile>();
@@ -36,12 +36,13 @@ public class Pathfinding
 
             foreach (Grid.Tile neighbor in GetNeighbors(currentTile))
             {
-                if (closedSet.Contains(neighbor) || neighbor.occupied) // Skip occupied or already processed tiles
+                // Avoid tiles within the danger zone or that are occupied if the flag is set
+                if (closedSet.Contains(neighbor) || neighbor.occupied || (avoidDangerZones && IsTileInDangerZone(neighbor, dangerZoneRadius)))
                 {
                     continue;
                 }
 
-                int tentativeGScore = gScore[currentTile] + 1; // Distance between adjacent tiles is always 1
+                int tentativeGScore = gScore[currentTile] + 1;  // Distance between adjacent tiles is always 1
 
                 if (!gScore.ContainsKey(neighbor) || tentativeGScore < gScore[neighbor])
                 {
@@ -58,8 +59,25 @@ public class Pathfinding
         }
 
         Debug.LogError("No path found!");
-        return null; // No path found
+        return null;  // No path found
     }
+
+    // Helper function to check if a tile is within a danger zone
+    private bool IsTileInDangerZone(Grid.Tile tile, float dangerZoneRadius)
+    {
+        Collider[] hits = Physics.OverlapSphere(Grid.Instance.WorldPos(tile), dangerZoneRadius);
+        foreach (Collider hit in hits)
+        {
+            if (hit.CompareTag("Zombie"))
+            {
+                return true; // Tile is in danger zone
+            }
+        }
+        return false;
+    }
+
+
+
 
     // Get the neighbors of the current tile, restricted to up, down, left, and right
     private List<Grid.Tile> GetNeighbors(Grid.Tile tile)
