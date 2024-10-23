@@ -80,9 +80,6 @@ public class Pathfinding
 
 
 
-
-
-
     // Get the neighbors of the current tile, restricted to up, down, left, and right
     private List<Grid.Tile> GetNeighbors(Grid.Tile tile)
     {

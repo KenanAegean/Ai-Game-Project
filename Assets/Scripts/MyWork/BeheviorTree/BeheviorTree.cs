@@ -1,5 +1,6 @@
-using UnityEngine;
 using System.Collections.Generic;
+using UnityEngine;
+
 
 public abstract class BehaviorNode
 {
@@ -59,101 +60,11 @@ public class BehaviorTree
     }
 }
 
-// Node: Check if Kim is near an occupied zone (previously "IsInDangerZone")
-public class IsCloseToOccupiedZone : BehaviorNode
-{
-    private Kim kim;
-
-    public IsCloseToOccupiedZone(Kim kim)
-    {
-        this.kim = kim;
-    }
-
-    public override bool Execute()
-    {
-        Debug.Log("Checking if Kim is close to an occupied zone...");
-
-        kim.MarkAndVisualizeZombieZones(); // Update occupied zone status
-
-        if (kim.isInDangerZone)  // Here "isInDangerZone" refers to being close to occupied zones
-        {
-            Debug.Log("Kim is close to an occupied zone. Recalculating path...");
-            return true;
-        }
-        else
-        {
-            Debug.Log("Kim is not near any occupied zones.");
-            return false;
-        }
-    }
-}
-
-// Node: Recalculate the path to avoid occupied zones
-public class RecalculatePathToAvoidOccupiedZones : BehaviorNode
-{
-    private Kim kim;
-
-    public RecalculatePathToAvoidOccupiedZones(Kim kim)
-    {
-        this.kim = kim;
-    }
-
-    public override bool Execute()
-    {
-        // Recalculate the path avoiding the occupied zones
-        kim.RecalculatePath(null, true); // Pass true to avoid occupied zones
-        return !kim.isWaitingForPath; // Return true if Kim can follow the new path
-    }
-}
-
-// Node: Retry movement if Kim is stuck
-public class RetryMovementIfStuck : BehaviorNode
-{
-    private Kim kim;
-    private float stuckCheckInterval = 2.0f; // Check every 2 seconds
-    private Vector3 lastPosition;
-    private float timeSinceLastMove;
-
-    public RetryMovementIfStuck(Kim kim)
-    {
-        this.kim = kim;
-        this.lastPosition = kim.transform.position;
-        this.timeSinceLastMove = 0f;
-    }
-
-    public override bool Execute()
-    {
-        // Check if Kim's position has changed since the last check
-        if (Vector3.Distance(kim.transform.position, lastPosition) < 0.1f)
-        {
-            timeSinceLastMove += Time.deltaTime;
-
-            // If Kim has been stuck for too long, force a path recalculation
-            if (timeSinceLastMove >= stuckCheckInterval)
-            {
-                Debug.Log("Kim is stuck, retrying path calculation...");
-                kim.RecalculatePath(null, true); // Recalculate path avoiding danger zones
-                timeSinceLastMove = 0f; // Reset the stuck timer
-                return true; // Kim was stuck, path recalculation triggered
-            }
-        }
-        else
-        {
-            // Kim is moving, reset the stuck timer and position check
-            timeSinceLastMove = 0f;
-            lastPosition = kim.transform.position;
-        }
-
-        return false; // No need to retry, Kim is not stuck
-    }
-}
-
-// Node: Check if the path is clear (or if Kim is not stuck)
+// Node: Check if the path is clear of obstacles
 public class IsPathClear : BehaviorNode
 {
     public override bool Execute()
     {
-        // For now, we assume the path is always clear
         return true;
     }
 }
@@ -170,8 +81,7 @@ public class MoveToBurgerAction : BehaviorNode
 
     public override bool Execute()
     {
-        // Logic for moving towards the closest burger or target
-        kim.MoveAlongPath(); // Continue moving along the current path
+        kim.MoveAlongPath();
         return true;
     }
 }
@@ -188,22 +98,54 @@ public class CheckAndSwitchTarget : BehaviorNode
 
     public override bool Execute()
     {
-        // Check if Kim has collected a burger
         kim.CheckIfCollectedBurger();
-
         if (kim.hasCollectedBurger)
         {
-            kim.SetPathToClosestBurger(); // Set the next target
-            kim.hasCollectedBurger = false; // Reset the flag
+            kim.SetPathToClosestBurger();
+            kim.hasCollectedBurger = false;
             return true;
         }
         else if (!kim.AreBurgersLeft())
         {
-            // If all burgers are collected, set the target to the finish line
             kim.SetPathToFinishLine();
             return true;
         }
+        return false;
+    }
+}
 
+// Node: Retry movement if Kim is stuck
+public class RetryMovementIfStuck : BehaviorNode
+{
+    private Kim kim;
+    private float stuckCheckInterval = 2.0f;
+    private Vector3 lastPosition;
+    private float timeSinceLastMove;
+
+    public RetryMovementIfStuck(Kim kim)
+    {
+        this.kim = kim;
+        this.lastPosition = kim.transform.position;
+        this.timeSinceLastMove = 0f;
+    }
+
+    public override bool Execute()
+    {
+        if (Vector3.Distance(kim.transform.position, lastPosition) < 0.1f)
+        {
+            timeSinceLastMove += Time.deltaTime;
+            if (timeSinceLastMove >= stuckCheckInterval)
+            {
+                kim.RecalculatePath();
+                timeSinceLastMove = 0f;
+                return true;
+            }
+        }
+        else
+        {
+            timeSinceLastMove = 0f;
+            lastPosition = kim.transform.position;
+        }
         return false;
     }
 }
