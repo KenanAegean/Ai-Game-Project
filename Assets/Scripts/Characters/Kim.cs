@@ -27,6 +27,8 @@ public class Kim : CharacterController
     [SerializeField] private float pathRecalculationInterval = 2.0f; // Kim will recalculate her path every 2 seconds
     private float timeSinceLastRecalculation = 0f; // Time tracker for recalculating the path
 
+    private Grid.Tile skippedTarget = null;
+
 
     public override void StartCharacter()
     {
@@ -163,7 +165,11 @@ public class Kim : CharacterController
         if (currentPath == null || currentPath.Count == 0)
         {
             isWaitingForPath = true;
-            Debug.Log("No path found. Kim is waiting...");
+            Debug.Log("No path available. Checking for next target...");
+
+            // Switch to the next target
+            SwitchToNextTarget();
+
         }
         else
         {
@@ -185,6 +191,83 @@ public class Kim : CharacterController
             Debug.Log("Kim's path recalculated. Starting movement.");
         }
     }
+
+    private void SwitchToNextTarget()
+    {
+        // Remove the current target from the list (as Kim can't reach it)
+        if (targets.Count > 0)
+        {
+            Grid.Tile currentTarget = targets[0]; // Get the current target
+            targets.RemoveAt(0); // Remove the current target from the list
+
+            // Keep track of the skipped burger if it's not the finish line
+            if (currentTarget != finishTile)
+            {
+                skippedTarget = currentTarget;
+            }
+        }
+
+        // Check if we have reached the finish line
+        if (targets.Count > 0)
+        {
+            Grid.Tile nextTarget = targets[0];
+
+            if (nextTarget == finishTile)
+            {
+                // If we have skipped a target, insert it before the finish line
+                if (skippedTarget != null)
+                {
+                    Debug.Log("Adding skipped target back to the list before the finish line.");
+                    targets.Insert(targets.Count - 1, skippedTarget); // Insert the skipped target before the finish line
+                    skippedTarget = null; // Reset the skipped target
+                }
+
+                // Wait if the next target is the finish line and zombies are nearby
+                Debug.Log("Next target is the finish line. Waiting for zombies to move away...");
+
+                // Check if zombies are near the finish line
+                List<Grid.Tile> dangerTiles = occupiedZones.GetOccupiedTiles();
+                bool zombiesNearFinish = IsNearDangerZone(finishTile, dangerTiles);
+
+                if (zombiesNearFinish)
+                {
+                    // Keep waiting and do not recalculate the path until zombies move away
+                    isWaitingForPath = true;
+                    return;
+                }
+                else
+                {
+                    // If no zombies are near the finish line, recalculate the path to the finish
+                    Debug.Log("Zombies have moved away. Recalculating path to finish line.");
+                    RecalculatePath(finishTile);
+                }
+            }
+            else
+            {
+                // Switch to the next target (burger or finish line)
+                Debug.Log("Switching to the next target.");
+                RecalculatePath(nextTarget);
+            }
+        }
+        else
+        {
+            Debug.Log("No more targets left.");
+        }
+    }
+
+    private bool IsNearDangerZone(Grid.Tile targetTile, List<Grid.Tile> dangerZones)
+    {
+        foreach (Grid.Tile tile in dangerZones)
+        {
+            if (tile == targetTile)
+            {
+                return true; // The target tile is in a danger zone (zombies are nearby)
+            }
+        }
+        return false;
+    }
+
+
 
     // Helper function to find the closest tile on the current path to smooth transition
     private Grid.Tile FindClosestTileOnCurrentPath()

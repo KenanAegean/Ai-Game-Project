@@ -9579,7 +9579,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: be54abd8218e134459a32ac45aa98548, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  dangerRadius: 1.5
+  dangerRadius: 3
 --- !u!4 &943758269
 Transform:
   m_ObjectHideFlags: 0
@@ -10817,7 +10817,7 @@ PrefabInstance:
     - target: {fileID: 3846718407826640484, guid: e74821599e1428f4fb096b33ee329de8,
         type: 3}
       propertyPath: contextRadius
-      value: 20
+      value: 5
       objectReference: {fileID: 0}
     - target: {fileID: 3846718407826640484, guid: e74821599e1428f4fb096b33ee329de8,
         type: 3}
@@ -10837,7 +10837,7 @@ PrefabInstance:
     - target: {fileID: 3846718407826640484, guid: e74821599e1428f4fb096b33ee329de8,
         type: 3}
       propertyPath: pathRecalculationInterval
-      value: 2
+      value: 0.2
       objectReference: {fileID: 0}
     - target: {fileID: 8486096355810131729, guid: e74821599e1428f4fb096b33ee329de8,
         type: 3}
