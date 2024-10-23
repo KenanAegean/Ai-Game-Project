@@ -3,7 +3,8 @@ using UnityEngine;
 
 public class Kim : CharacterController
 {
-    [SerializeField] float contextRadius;
+    [SerializeField] private bool debugMode = false;
+    [SerializeField] private float contextRadius;
     private Pathfinding pathfinding;
     private List<Grid.Tile> currentPath;
     private int currentPathIndex = 0;
@@ -16,15 +17,11 @@ public class Kim : CharacterController
     public bool isWaitingForPath = false;
     public bool hasCollectedBurger = false;
 
-
     // Blackboard for the behavior tree
     private Blackboard blackboard = new Blackboard();
 
     // Behavior tree
     private BehaviorTree behaviorTree;
-
-    // Movement speed
-    protected const float CharacterMoveSpeed = 1.0f;
 
     public override void StartCharacter()
     {
@@ -33,42 +30,41 @@ public class Kim : CharacterController
         // Initialize pathfinding
         pathfinding = new Pathfinding(Grid.Instance);
 
-        // Ensure Kim is aligned to the grid tile (snaps to the nearest tile)
-        AlignToGrid();
-
         // Store all burger positions at the start
         burgerTiles = GetAllBurgerTiles();
         finishTile = Grid.Instance.GetFinishTile();
+
+        burgerTiles.Add(finishTile); // Always add the finish tile as the last target
 
         // Set up the blackboard with initial information
         blackboard.Set("burgers", burgerTiles);
 
         // Initialize the behavior tree
         behaviorTree = new BehaviorTree(
-            new Selector(    
+            new Selector(
                 new Sequence(
-                    new IsPathClear(), // Assuming path is always clear for now
-                    new MoveToBurgerAction(this),  // Move Kim towards the closest burger
-                    new CheckAndSwitchTarget(this)  // Check if the target needs switching (burgers -> finish line)
+                    new IsPathClear(),
+                    new MoveToTarget(this),
+                    new CheckAndSwitchTarget(this),
+                    new IsPathClear(),
+                    new MoveToTarget(this)
                 ),
-                new RetryMovementIfStuck(this)  // Retry movement if Kim gets stuck
+                new RetryMovementIfStuck(this),
+                new IsPathClear(),
+                new MoveToTarget(this)
             )
         );
 
-
-
-
-        // Set the initial path to the nearest burger and start moving
-        SetPathToClosestBurger();
-        MoveAlongPath();  // Start moving immediately after setting the path
+        // Set the initial path to the nearest burger
+        SetPathToTarget();
     }
 
     public override void UpdateCharacter()
     {
-        base.UpdateCharacter();
-
         // Execute the behavior tree
         behaviorTree.Execute();
+
+        base.UpdateCharacter();
 
         // Ensure Kim moves along the current path
         if (!isWaitingForPath && currentPath != null && currentPathIndex < currentPath.Count)
@@ -77,50 +73,46 @@ public class Kim : CharacterController
         }
     }
 
-    public bool AreBurgersLeft()
-    {
-        return burgerTiles != null && burgerTiles.Count > 0;
-    }
-
-    // Align Kim to the nearest grid tile (Snap to grid)
-    private void AlignToGrid()
-    {
-        Grid.Tile closestTile = Grid.Instance.GetClosest(transform.position);
-        transform.position = Grid.Instance.WorldPos(closestTile); // Snap Kim to the grid tile position
-        myCurrentTile = closestTile;  // Ensure Kim's current tile is set correctly
-        Debug.Log($"Kim aligned to grid tile at position {transform.position}");
-    }
-
-    // Set the path to the closest burger
-    public void SetPathToClosestBurger()
+    public void SetPathToTarget()
     {
         if (burgerTiles.Count > 0)
         {
-            Grid.Tile closestBurger = GetClosestBurgerTile();
-            RecalculatePath(closestBurger);
+            // Find the closest target (could be a burger or finish tile)
+            Grid.Tile closestTarget = GetClosestTarget();
+
+            // If the closest target is the finish tile but there are burgers left, switch to the closest burger
+            if (closestTarget == finishTile && AreBurgersLeft())
+            {
+                Debug.Log("Finish line is the closest, but burgers are left. Targeting the closest burger instead.");
+                closestTarget = GetClosestBurgerTile(); // Get the closest burger
+            }
+
+            // Recalculate the path to the selected target
+            RecalculatePath(closestTarget);
         }
         else
         {
-            SetPathToFinishLine();
+            Debug.Log("All targets reached.");
         }
     }
 
-    // Set the path to the finish line
-    public void SetPathToFinishLine()
-    {
-        RecalculatePath(finishTile);
-    }
 
     // Recalculate the path to a target
-    public void RecalculatePath(Grid.Tile targetTile = null, bool avoidOccupied = false)
+    public void RecalculatePath(Grid.Tile targetTile = null)
     {
-        // If no target is provided, use the closest burger or finish line
         if (targetTile == null)
         {
-            targetTile = GetClosestBurgerTile() ?? finishTile;
+            Debug.LogError("No target specified for path recalculation.");
+            return;
         }
 
         Grid.Tile startTile = Grid.Instance.GetClosest(transform.position);
+
+        // Clear the current path before recalculating
+        if (currentPath != null)
+        {
+            currentPath.Clear();  // Ensures no leftover path data is present
+        }
 
         // Recalculate the path using dynamicOccupiedTiles when avoiding the occupied zone
         currentPath = pathfinding.FindPath(startTile, targetTile);
@@ -136,114 +128,88 @@ public class Kim : CharacterController
             currentPathIndex = 0;
 
             // Log the recalculated path
-            Debug.Log("Recalculated path:");
-            foreach (var tile in currentPath)
+            if (debugMode)
             {
-                Debug.Log($"Tile at ({tile.x}, {tile.y})");
+                Debug.Log("Recalculated path:");
+                foreach (var tile in currentPath)
+                {
+                    Debug.Log($"Tile at ({tile.x}, {tile.y})");
+                }
             }
 
             // Set walk buffer using the newly calculated path
-            SetWalkBuffer(currentPath);
+            SetWalkBuffer(currentPath);  // This will handle clearing the buffer
             Debug.Log("Kim's path recalculated. Starting movement.");
         }
     }
 
 
-
-    private void RetryRecalculatePath()
-    {
-        RecalculatePath(null, true); // Retry by avoiding danger zones again
-    }
-
-
-
     // Move along the current path
     public void MoveAlongPath()
     {
-        if (currentPath == null || currentPathIndex >= currentPath.Count || isWaitingForPath)
+        //SetWalkBuffer(currentPath);
+        //base.UpdateCharacter();
+        if (currentPath == null)
         {
-            Debug.LogWarning("No valid path to follow or Kim is waiting.");
+            Debug.LogWarning("No path available.");
             return;
         }
 
-        // Log how many tiles are left to the target
-        int tilesLeft = currentPath.Count - currentPathIndex;
-        Debug.Log($"Tiles left to target: {tilesLeft}");
+        if (currentPathIndex >= currentPath.Count)
+        {
+            Debug.LogWarning("Path completed.");
+            return;
+        }
+
+        if (isWaitingForPath)
+        {
+            Debug.LogWarning("Kim is waiting for a new path.");
+            return;
+        }
 
         Grid.Tile targetTile = currentPath[currentPathIndex];
         Vector3 targetPosition = Grid.Instance.WorldPos(targetTile);
 
-        // Debug target position to ensure we're moving towards a valid point
-        Debug.Log($"Moving towards target position: {targetPosition}");
-        Debug.Log($"Kim's current position: {transform.position}");
-
-        // If Kim's current position is the same as the target position, move to the next tile
-        if (Vector3.Distance(transform.position, targetPosition) < ReachDistThreshold)
-        {
-            Debug.Log($"Reached tile {currentPathIndex}, moving to the next tile...");
-            currentPathIndex++; // Move to the next tile
-
-            // Log how many tiles are left after moving to the next tile
-            tilesLeft = currentPath.Count - currentPathIndex;
-            Debug.Log($"After moving, tiles left to target: {tilesLeft}");
-
-            // If we've reached the end of the path, reset the path
-            if (currentPathIndex >= currentPath.Count)
-            {
-                Debug.Log("Path complete. No more tiles to follow.");
-                currentPath = null; // Reset the path once all tiles are reached
-                return;
-            }
-
-            // Get the new target position after incrementing the path index
-            targetTile = currentPath[currentPathIndex];
-            targetPosition = Grid.Instance.WorldPos(targetTile);
-            Debug.Log($"New target position: {targetPosition}");
-        }
-
-        // Calculate the direction and magnitude
+        // Move towards the target
         Vector3 direction = (targetPosition - transform.position).normalized;
+        //transform.position = Vector3.MoveTowards(transform.position, targetPosition, CharacterMoveSpeed * Time.deltaTime);
+        //SetWalkBuffer(currentPath);
+
         float distanceToTarget = Vector3.Distance(transform.position, targetPosition);
-
-        // Debug direction vector and distance
-        Debug.Log($"Direction vector: {direction}");
-        Debug.Log($"Distance to target: {distanceToTarget}");
-
-        // If the distance is very small, snap to the target position
         if (distanceToTarget < ReachDistThreshold)
         {
-            transform.position = targetPosition; // Snap Kim to the target position
-            Debug.Log("Kim snapped to the target position due to small distance.");
-        }
-        else if (direction.magnitude > 0.001f)  // Ensure direction magnitude is non-zero before moving
-        {
-            // Apply movement to Kim based on the direction and speed
-            transform.position += direction * CharacterMoveSpeed * Time.deltaTime;
-            Debug.Log($"Kim moved towards the target. New position: {transform.position}");
-        }
-        else
-        {
-            Debug.LogWarning("Movement direction is zero. No movement.");
+            currentPathIndex++; // Move to next tile
+            if (currentPathIndex >= currentPath.Count)
+            {
+                currentPath = null;
+                Debug.Log("Path complete. No more tiles to follow.");
+                return;
+            }
         }
 
         // Visualize the path
         VisualizePath();
     }
 
-
-
     // Visualize the path
     private void VisualizePath()
     {
-        for (int i = 0; i < currentPath.Count - 1; i++)
+        if (currentPath != null)
         {
-            Vector3 from = Grid.Instance.WorldPos(currentPath[i]);
-            Vector3 to = Grid.Instance.WorldPos(currentPath[i + 1]);
-            Debug.DrawLine(from, to, Color.red, 0.5f);
+            for (int i = 0; i < currentPath.Count - 1; i++)
+            {
+                Vector3 from = Grid.Instance.WorldPos(currentPath[i]);
+                Vector3 to = Grid.Instance.WorldPos(currentPath[i + 1]);
+                Debug.DrawLine(from, to, Color.red, 0.5f);
+            }
         }
     }
 
-    // Get all burger tiles at the start of the game
+    public bool AreBurgersLeft()
+    {
+        return burgerTiles != null && burgerTiles.Count > 1; // More than one means burgers are still left
+    }
+
     public List<Grid.Tile> GetAllBurgerTiles()
     {
         List<Grid.Tile> burgerTiles = new List<Grid.Tile>();
@@ -261,14 +227,36 @@ public class Kim : CharacterController
         return burgerTiles;
     }
 
-    // Get the closest burger tile
+    // Get the closest target (either a burger or the finish line)
+    public Grid.Tile GetClosestTarget()
+    {
+        Grid.Tile closestTarget = null;
+        float shortestDistance = float.MaxValue;
+
+        foreach (Grid.Tile target in burgerTiles)
+        {
+            float distance = Vector3.Distance(transform.position, Grid.Instance.WorldPos(target));
+
+            if (distance < shortestDistance)
+            {
+                shortestDistance = distance;
+                closestTarget = target;
+            }
+        }
+
+        return closestTarget;
+    }
+
+    // Get the closest burger tile (ignore the finish tile)
     public Grid.Tile GetClosestBurgerTile()
     {
         Grid.Tile closestBurgerTile = null;
         float shortestDistance = float.MaxValue;
 
-        foreach (Grid.Tile burgerTile in burgerTiles)
+        // Ignore the last item (which is the finish tile)
+        for (int i = 0; i < burgerTiles.Count - 1; i++)
         {
+            Grid.Tile burgerTile = burgerTiles[i];
             float distance = Vector3.Distance(transform.position, Grid.Instance.WorldPos(burgerTile));
 
             if (distance < shortestDistance)
@@ -281,23 +269,17 @@ public class Kim : CharacterController
         return closestBurgerTile;
     }
 
-    // Check if Kim collected a burger
     public void CheckIfCollectedBurger()
     {
         Grid.Tile currentTile = Grid.Instance.GetClosest(transform.position);
         if (burgerTiles.Contains(currentTile))
         {
-            // Remove the collected burger
             burgerTiles.Remove(currentTile);
             hasCollectedBurger = true;
             Debug.Log("Kim collected a burger.");
 
             // Immediately recalculate path to next target
-            SetPathToClosestBurger();
+            SetPathToTarget();
         }
     }
-
 }
-
-
-

@@ -48,7 +48,7 @@ public class CharacterController : MonoBehaviour
 
             if (myReachedTile && myCurrentTile == t) myWalkBuffer.RemoveAt(0);
         }
-        else if(myReachedTile)
+        else if (myReachedTile)
         {
             myAnimator.SetBool("Walk", false);
         }
@@ -62,19 +62,18 @@ public class CharacterController : MonoBehaviour
 
         model = transform.GetChild(0).transform;
     }
-    public void SetForward(Vector3 forward)
+    void SetForward(Vector3 forward)
     {
         Vector3 newForward = forward;
-        newForward.y = 0;
+        newForward.y = 0;  // Keep the character facing horizontally
 
-        // Ensure the forward vector is not zero
-        if (newForward.magnitude > 0.001f)
+        if (newForward.sqrMagnitude > 0.0001f) // Check if the vector is not zero
         {
             model.forward = newForward.normalized;
         }
         else
         {
-            Debug.LogWarning("Look rotation viewing vector is zero. Not updating forward direction.");
+            Debug.LogWarning("Look rotation viewing vector is zero, skipping rotation.");
         }
     }
 

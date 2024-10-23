@@ -85,7 +85,7 @@ public class RetryMovementIfStuck : BehaviorNode
             if (timeSinceLastMove >= stuckCheckInterval)
             {
                 Debug.Log("Kim is stuck, retrying path calculation...");
-                kim.RecalculatePath(null, true); // Recalculate path avoiding danger zones
+                kim.RecalculatePath(); // Recalculate path avoiding danger zones
                 timeSinceLastMove = 0f; // Reset the stuck timer
                 return true; // Kim was stuck, path recalculation triggered
             }
@@ -111,12 +111,12 @@ public class IsPathClear : BehaviorNode
     }
 }
 
-// Node: Move Kim to the nearest burger or target
-public class MoveToBurgerAction : BehaviorNode
+
+public class MoveToTarget : BehaviorNode
 {
     private Kim kim;
 
-    public MoveToBurgerAction(Kim kim)
+    public MoveToTarget(Kim kim)
     {
         this.kim = kim;
     }
@@ -146,16 +146,10 @@ public class CheckAndSwitchTarget : BehaviorNode
 
         if (kim.hasCollectedBurger)
         {
-            kim.SetPathToClosestBurger(); // Set the next target
+            kim.SetPathToTarget(); // Set the next target
             kim.hasCollectedBurger = false; // Reset the flag
             return true;
-        }
-        else if (!kim.AreBurgersLeft())
-        {
-            // If all burgers are collected, set the target to the finish line
-            kim.SetPathToFinishLine();
-            return true;
-        }
+        }        
 
         return false;
     }
