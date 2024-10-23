@@ -10,12 +10,12 @@ public class Kim : CharacterController
     private int currentPathIndex = 0;
 
     // Store burger and finish line positions
-    public List<Grid.Tile> burgerTiles { get; private set; }
+    public List<Grid.Tile> targets { get; private set; }
     public Grid.Tile finishTile { get; private set; }
 
     // Status flags
     public bool isWaitingForPath = false;
-    public bool hasCollectedBurger = false;
+    public bool hasCollectedTargets = false;
 
     // Blackboard for the behavior tree
     private Blackboard blackboard = new Blackboard();
@@ -31,13 +31,13 @@ public class Kim : CharacterController
         pathfinding = new Pathfinding(Grid.Instance);
 
         // Store all burger positions at the start
-        burgerTiles = GetAllBurgerTiles();
+        targets = GetAllBurgerTiles();
         finishTile = Grid.Instance.GetFinishTile();
 
-        burgerTiles.Add(finishTile); // Always add the finish tile as the last target
+        targets.Add(finishTile); // Always add the finish tile as the last target
 
         // Set up the blackboard with initial information
-        blackboard.Set("burgers", burgerTiles);
+        blackboard.Set("burgers", targets);
 
         // Initialize the behavior tree
         behaviorTree = new BehaviorTree(
@@ -75,7 +75,7 @@ public class Kim : CharacterController
 
     public void SetPathToTarget()
     {
-        if (burgerTiles.Count > 0)
+        if (targets.Count > 0)
         {
             // Find the closest target (could be a burger or finish tile)
             Grid.Tile closestTarget = GetClosestTarget();
@@ -207,12 +207,12 @@ public class Kim : CharacterController
 
     public bool AreBurgersLeft()
     {
-        return burgerTiles != null && burgerTiles.Count > 1; // More than one means burgers are still left
+        return targets != null && targets.Count > 1; // More than one means burgers are still left
     }
 
     public List<Grid.Tile> GetAllBurgerTiles()
     {
-        List<Grid.Tile> burgerTiles = new List<Grid.Tile>();
+        List<Grid.Tile> targets = new List<Grid.Tile>();
         GameObject[] allBurgers = GameObject.FindGameObjectsWithTag("Burger");
 
         foreach (GameObject burger in allBurgers)
@@ -220,11 +220,11 @@ public class Kim : CharacterController
             Grid.Tile burgerTile = Grid.Instance.GetClosest(burger.transform.position);
             if (burgerTile != null)
             {
-                burgerTiles.Add(burgerTile);
+                targets.Add(burgerTile);
             }
         }
 
-        return burgerTiles;
+        return targets;
     }
 
     // Get the closest target (either a burger or the finish line)
@@ -233,7 +233,7 @@ public class Kim : CharacterController
         Grid.Tile closestTarget = null;
         float shortestDistance = float.MaxValue;
 
-        foreach (Grid.Tile target in burgerTiles)
+        foreach (Grid.Tile target in targets)
         {
             float distance = Vector3.Distance(transform.position, Grid.Instance.WorldPos(target));
 
@@ -254,9 +254,9 @@ public class Kim : CharacterController
         float shortestDistance = float.MaxValue;
 
         // Ignore the last item (which is the finish tile)
-        for (int i = 0; i < burgerTiles.Count - 1; i++)
+        for (int i = 0; i < targets.Count - 1; i++)
         {
-            Grid.Tile burgerTile = burgerTiles[i];
+            Grid.Tile burgerTile = targets[i];
             float distance = Vector3.Distance(transform.position, Grid.Instance.WorldPos(burgerTile));
 
             if (distance < shortestDistance)
@@ -269,13 +269,13 @@ public class Kim : CharacterController
         return closestBurgerTile;
     }
 
-    public void CheckIfCollectedBurger()
+    public void CheckIfCollectedTarget()
     {
         Grid.Tile currentTile = Grid.Instance.GetClosest(transform.position);
-        if (burgerTiles.Contains(currentTile))
+        if (targets.Contains(currentTile))
         {
-            burgerTiles.Remove(currentTile);
-            hasCollectedBurger = true;
+            targets.Remove(currentTile);
+            hasCollectedTargets = true;
             Debug.Log("Kim collected a burger.");
 
             // Immediately recalculate path to next target

@@ -142,12 +142,12 @@ public class CheckAndSwitchTarget : BehaviorNode
     public override bool Execute()
     {
         // Check if Kim has collected a burger
-        kim.CheckIfCollectedBurger();
+        kim.CheckIfCollectedTarget();
 
-        if (kim.hasCollectedBurger)
+        if (kim.hasCollectedTargets)
         {
             kim.SetPathToTarget(); // Set the next target
-            kim.hasCollectedBurger = false; // Reset the flag
+            kim.hasCollectedTargets = false; // Reset the flag
             return true;
         }        
 
