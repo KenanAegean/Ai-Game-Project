@@ -4,16 +4,19 @@ using UnityEngine;
 public class Pathfinding
 {
     private Grid grid;
+    private OccupiedZones occupiedZones;
 
     public Pathfinding(Grid grid)
     {
         this.grid = grid;
+        this.occupiedZones = GameObject.FindObjectOfType<OccupiedZones>(); // Reference to the occupied zones
     }
 
     public List<Grid.Tile> FindPath(Grid.Tile startTile, Grid.Tile targetTile)
     {
         List<Grid.Tile> openSet = new List<Grid.Tile> { startTile };
         HashSet<Grid.Tile> closedSet = new HashSet<Grid.Tile>();
+        List<Grid.Tile> dangerTiles = occupiedZones.GetOccupiedTiles(); // Get all danger tiles from the occupied zones
 
         Dictionary<Grid.Tile, Grid.Tile> cameFrom = new Dictionary<Grid.Tile, Grid.Tile>();
         Dictionary<Grid.Tile, int> gScore = new Dictionary<Grid.Tile, int>();
@@ -28,7 +31,7 @@ public class Pathfinding
 
             if (currentTile == targetTile)
             {
-                return ReconstructPath(cameFrom, currentTile); // Found the path
+                return ReconstructPath(cameFrom, currentTile); // Path found
             }
 
             openSet.Remove(currentTile);
@@ -36,9 +39,9 @@ public class Pathfinding
 
             foreach (Grid.Tile neighbor in GetNeighbors(currentTile))
             {
-                if (closedSet.Contains(neighbor) || neighbor.occupied) // Skip occupied tiles or already processed ones
+                if (closedSet.Contains(neighbor) || neighbor.occupied || dangerTiles.Contains(neighbor))
                 {
-                    continue;
+                    continue; // Skip if occupied or in danger zone
                 }
 
                 int tentativeGScore = gScore[currentTile] + 1; // Distance between adjacent tiles is always 1
@@ -60,21 +63,6 @@ public class Pathfinding
         Debug.LogError("No path found!");
         return null; // No path found
     }
-
-    // Helper function to check if a tile is in danger
-    private bool IsTileInDangerZone(Grid.Tile tile, List<Grid.Tile> dangerTiles)
-    {
-        if (dangerTiles == null)
-        {
-            return false;
-        }
-
-        return dangerTiles.Contains(tile);
-    }
-
-
-
-
 
 
     // Get the neighbors of the current tile, restricted to up, down, left, and right

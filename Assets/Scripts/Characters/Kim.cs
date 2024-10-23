@@ -22,13 +22,15 @@ public class Kim : CharacterController
 
     // Behavior tree
     private BehaviorTree behaviorTree;
+    private OccupiedZones occupiedZones;
 
     public override void StartCharacter()
     {
         base.StartCharacter();
 
-        // Initialize pathfinding
+        // Initialize pathfinding and occupied zones
         pathfinding = new Pathfinding(Grid.Instance);
+        occupiedZones = GameObject.FindObjectOfType<OccupiedZones>(); // Reference to the occupied zones
 
         // Store all burger positions at the start
         targets = GetAllBurgerTiles();
@@ -97,7 +99,6 @@ public class Kim : CharacterController
     }
 
 
-    // Recalculate the path to a target
     public void RecalculatePath(Grid.Tile targetTile = null)
     {
         if (targetTile == null)
@@ -114,7 +115,17 @@ public class Kim : CharacterController
             currentPath.Clear();  // Ensures no leftover path data is present
         }
 
-        // Recalculate the path using dynamicOccupiedTiles when avoiding the occupied zone
+        // Check if occupiedZones is null
+        if (occupiedZones == null)
+        {
+            Debug.LogError("OccupiedZones not found!");
+            return; // Exit early if occupiedZones is null
+        }
+
+        // Get the danger tiles from the occupied zones system
+        List<Grid.Tile> dangerTiles = occupiedZones.GetOccupiedTiles();
+
+        // Recalculate the path using dynamicOccupiedTiles to avoid the occupied zone
         currentPath = pathfinding.FindPath(startTile, targetTile);
 
         if (currentPath == null || currentPath.Count == 0)
@@ -142,6 +153,7 @@ public class Kim : CharacterController
             Debug.Log("Kim's path recalculated. Starting movement.");
         }
     }
+
 
 
     // Move along the current path
