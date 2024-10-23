@@ -24,6 +24,10 @@ public class Kim : CharacterController
     private BehaviorTree behaviorTree;
     private OccupiedZones occupiedZones;
 
+    [SerializeField] private float pathRecalculationInterval = 2.0f; // Kim will recalculate her path every 2 seconds
+    private float timeSinceLastRecalculation = 0f; // Time tracker for recalculating the path
+
+
     public override void StartCharacter()
     {
         base.StartCharacter();
@@ -63,6 +67,16 @@ public class Kim : CharacterController
 
     public override void UpdateCharacter()
     {
+        // Update the path recalculation timer
+        timeSinceLastRecalculation += Time.deltaTime;
+
+        // Check if it's time to recalculate the path
+        if (timeSinceLastRecalculation >= pathRecalculationInterval)
+        {
+            SetPathToTarget(); // Recalculate the path regularly
+            timeSinceLastRecalculation = 0f; // Reset the timer
+        }
+
         // Execute the behavior tree
         behaviorTree.Execute();
 
@@ -73,6 +87,25 @@ public class Kim : CharacterController
         {
             MoveAlongPath();
         }
+    }
+
+    // Helper function to compare two lists of danger zones
+    private bool AreDangerZonesSame(List<Grid.Tile> lastDangerZones, List<Grid.Tile> currentDangerZones)
+    {
+        if (lastDangerZones.Count != currentDangerZones.Count)
+        {
+            return false;
+        }
+
+        for (int i = 0; i < lastDangerZones.Count; i++)
+        {
+            if (lastDangerZones[i] != currentDangerZones[i])
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     public void SetPathToTarget()
