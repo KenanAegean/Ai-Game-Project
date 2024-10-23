@@ -1,6 +1,5 @@
 using UnityEngine;
 using System.Collections.Generic;
-using UnityEditor.Experimental.GraphView;
 
 public abstract class BehaviorNode
 {
@@ -60,55 +59,50 @@ public class BehaviorTree
     }
 }
 
-// Node: Check if Kim is in a danger zone
-public class IsInDangerZone : BehaviorNode
+// Node: Check if Kim is near an occupied zone (previously "IsInDangerZone")
+public class IsCloseToOccupiedZone : BehaviorNode
 {
     private Kim kim;
 
-    public IsInDangerZone(Kim kim)
+    public IsCloseToOccupiedZone(Kim kim)
     {
         this.kim = kim;
     }
 
     public override bool Execute()
     {
-        Debug.Log("Checking if Kim is in a danger zone...");
+        Debug.Log("Checking if Kim is close to an occupied zone...");
 
-        kim.MarkAndVisualizeZombieZones(); // Update danger zone status
+        kim.MarkAndVisualizeZombieZones(); // Update occupied zone status
 
-        if (kim.isInDangerZone)
+        if (kim.isInDangerZone)  // Here "isInDangerZone" refers to being close to occupied zones
         {
-            Debug.Log("Kim is in a danger zone. Recalculating path...");
+            Debug.Log("Kim is close to an occupied zone. Recalculating path...");
             return true;
         }
         else
         {
-            Debug.Log("Kim is not in a danger zone.");
+            Debug.Log("Kim is not near any occupied zones.");
             return false;
         }
     }
 }
 
-
-// Node: Recalculate the path to avoid danger zones
-public class RecalculatePathToAvoidDanger : BehaviorNode
+// Node: Recalculate the path to avoid occupied zones
+public class RecalculatePathToAvoidOccupiedZones : BehaviorNode
 {
     private Kim kim;
 
-    public RecalculatePathToAvoidDanger(Kim kim)
+    public RecalculatePathToAvoidOccupiedZones(Kim kim)
     {
         this.kim = kim;
     }
 
     public override bool Execute()
     {
-        if (kim.isInDangerZone)
-        {
-            Debug.Log("Kim is in a danger zone. Recalculating path...");
-            kim.RecalculatePath(null, true);  // Pass true to avoid danger zones
-            return !kim.isWaitingForPath;
-        }
-        return true;
+        // Recalculate the path avoiding the occupied zones
+        kim.RecalculatePath(null, true); // Pass true to avoid occupied zones
+        return !kim.isWaitingForPath; // Return true if Kim can follow the new path
     }
 }
 
@@ -154,22 +148,12 @@ public class RetryMovementIfStuck : BehaviorNode
     }
 }
 
-
-
-
-// Node: Check if the path is clear of obstacles
+// Node: Check if the path is clear (or if Kim is not stuck)
 public class IsPathClear : BehaviorNode
 {
-    private Blackboard blackboard;
-
-    public IsPathClear(Blackboard blackboard)
-    {
-        this.blackboard = blackboard;
-    }
-
     public override bool Execute()
     {
-        // Assume the path is clear. You can add additional logic here later if needed.
+        // For now, we assume the path is always clear
         return true;
     }
 }
@@ -178,12 +162,10 @@ public class IsPathClear : BehaviorNode
 public class MoveToBurgerAction : BehaviorNode
 {
     private Kim kim;
-    private Blackboard blackboard;
 
-    public MoveToBurgerAction(Kim kim, Blackboard blackboard)
+    public MoveToBurgerAction(Kim kim)
     {
         this.kim = kim;
-        this.blackboard = blackboard;
     }
 
     public override bool Execute()

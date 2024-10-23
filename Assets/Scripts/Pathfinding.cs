@@ -10,7 +10,7 @@ public class Pathfinding
         this.grid = grid;
     }
 
-    public List<Grid.Tile> FindPath(Grid.Tile startTile, Grid.Tile targetTile, bool avoidDangerZones = false, float dangerZoneRadius = 0f)
+    public List<Grid.Tile> FindPath(Grid.Tile startTile, Grid.Tile targetTile, bool avoidDanger = false, List<Grid.Tile> dangerTiles = null)
     {
         List<Grid.Tile> openSet = new List<Grid.Tile> { startTile };
         HashSet<Grid.Tile> closedSet = new HashSet<Grid.Tile>();
@@ -36,13 +36,18 @@ public class Pathfinding
 
             foreach (Grid.Tile neighbor in GetNeighbors(currentTile))
             {
-                // Avoid tiles within the danger zone or that are occupied if the flag is set
-                if (closedSet.Contains(neighbor) || neighbor.occupied || (avoidDangerZones && IsTileInDangerZone(neighbor, dangerZoneRadius)))
+                if (closedSet.Contains(neighbor) || neighbor.occupied) // Skip occupied tiles or already processed ones
                 {
                     continue;
                 }
 
-                int tentativeGScore = gScore[currentTile] + 1;  // Distance between adjacent tiles is always 1
+                // Avoid danger zones if enabled
+                if (avoidDanger && IsTileInDangerZone(neighbor, dangerTiles))
+                {
+                    continue;  // Skip tiles that are in danger zones
+                }
+
+                int tentativeGScore = gScore[currentTile] + 1; // Distance between adjacent tiles is always 1
 
                 if (!gScore.ContainsKey(neighbor) || tentativeGScore < gScore[neighbor])
                 {
@@ -59,22 +64,21 @@ public class Pathfinding
         }
 
         Debug.LogError("No path found!");
-        return null;  // No path found
+        return null; // No path found
     }
 
-    // Helper function to check if a tile is within a danger zone
-    private bool IsTileInDangerZone(Grid.Tile tile, float dangerZoneRadius)
+    // Helper function to check if a tile is in danger
+    private bool IsTileInDangerZone(Grid.Tile tile, List<Grid.Tile> dangerTiles)
     {
-        Collider[] hits = Physics.OverlapSphere(Grid.Instance.WorldPos(tile), dangerZoneRadius);
-        foreach (Collider hit in hits)
+        if (dangerTiles == null)
         {
-            if (hit.CompareTag("Zombie"))
-            {
-                return true; // Tile is in danger zone
-            }
+            return false;
         }
-        return false;
+
+        return dangerTiles.Contains(tile);
     }
+
+
 
 
 

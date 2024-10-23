@@ -52,17 +52,18 @@ public class Kim : CharacterController
         behaviorTree = new BehaviorTree(
             new Selector(
                 new Sequence(
-                    new IsInDangerZone(this),
-                    new RecalculatePathToAvoidDanger(this)
+                    new IsCloseToOccupiedZone(this),   // Check if Kim is near an occupied zone
+                    new RecalculatePathToAvoidOccupiedZones(this)  // Recalculate path avoiding occupied zones
                 ),
                 new Sequence(
-                    new IsPathClear(blackboard),
-                    new MoveToBurgerAction(this, blackboard),
-                    new CheckAndSwitchTarget(this)
+                    new IsPathClear(), // Assuming path is always clear for now
+                    new MoveToBurgerAction(this),  // Move Kim towards the closest burger
+                    new CheckAndSwitchTarget(this)  // Check if the target needs switching (burgers -> finish line)
                 ),
-                new RetryMovementIfStuck(this) // New logic to keep retrying movement
+                new RetryMovementIfStuck(this)  // Retry movement if Kim gets stuck
             )
         );
+
 
 
 
@@ -136,8 +137,11 @@ public class Kim : CharacterController
 
         Grid.Tile startTile = Grid.Instance.GetClosest(transform.position);
 
-        // Pass the occupied zone avoidance flag when recalculating the path
-        currentPath = pathfinding.FindPath(startTile, targetTile, avoidOccupied, occupiedZoneRadius);  // Use occupied zone
+        // Pass the occupied tiles list if avoiding occupied zones
+        List<Grid.Tile> tilesToAvoid = avoidOccupied ? dynamicOccupiedTiles : null;
+
+        // Recalculate the path using dynamicOccupiedTiles when avoiding the occupied zone
+        currentPath = pathfinding.FindPath(startTile, targetTile, avoidOccupied, tilesToAvoid);
 
         if (currentPath == null || currentPath.Count == 0)
         {
@@ -163,6 +167,7 @@ public class Kim : CharacterController
     }
 
 
+
     private void RetryRecalculatePath()
     {
         RecalculatePath(null, true); // Retry by avoiding danger zones again
@@ -174,37 +179,65 @@ public class Kim : CharacterController
     public void MoveAlongPath()
     {
         if (currentPath == null || currentPathIndex >= currentPath.Count || isWaitingForPath)
+        {
+            Debug.LogWarning("No valid path to follow or Kim is waiting.");
             return;
+        }
+
+        // Log how many tiles are left to the target
+        int tilesLeft = currentPath.Count - currentPathIndex;
+        Debug.Log($"Tiles left to target: {tilesLeft}");
 
         Grid.Tile targetTile = currentPath[currentPathIndex];
         Vector3 targetPosition = Grid.Instance.WorldPos(targetTile);
 
         // Debug target position to ensure we're moving towards a valid point
         Debug.Log($"Moving towards target position: {targetPosition}");
+        Debug.Log($"Kim's current position: {transform.position}");
 
-        Vector3 direction = (targetPosition - transform.position).normalized;
-
-        // Debug direction vector
-        Debug.Log($"Direction vector: {direction}");
-
-        // Ensure direction is valid before moving
-        if (direction.magnitude > 0.001f)
+        // If Kim's current position is the same as the target position, move to the next tile
+        if (Vector3.Distance(transform.position, targetPosition) < ReachDistThreshold)
         {
-            // Move Kim toward the target tile
-            transform.position += direction * CharacterMoveSpeed * Time.deltaTime;
-            float distanceToTarget = Vector3.Distance(transform.position, targetPosition);
+            Debug.Log($"Reached tile {currentPathIndex}, moving to the next tile...");
+            currentPathIndex++; // Move to the next tile
 
-            // Debug distance to target
-            Debug.Log($"Distance to target: {distanceToTarget}");
+            // Log how many tiles are left after moving to the next tile
+            tilesLeft = currentPath.Count - currentPathIndex;
+            Debug.Log($"After moving, tiles left to target: {tilesLeft}");
 
-            // If the distance to the target is small enough, we consider the target "reached"
-            if (distanceToTarget < ReachDistThreshold)
+            // If we've reached the end of the path, reset the path
+            if (currentPathIndex >= currentPath.Count)
             {
-                // Snap Kim to the target position and move to the next tile
-                transform.position = targetPosition;
-                currentPathIndex++;
-                Debug.Log($"Reached tile {currentPathIndex}, moving to the next tile...");
+                Debug.Log("Path complete. No more tiles to follow.");
+                currentPath = null; // Reset the path once all tiles are reached
+                return;
             }
+
+            // Get the new target position after incrementing the path index
+            targetTile = currentPath[currentPathIndex];
+            targetPosition = Grid.Instance.WorldPos(targetTile);
+            Debug.Log($"New target position: {targetPosition}");
+        }
+
+        // Calculate the direction and magnitude
+        Vector3 direction = (targetPosition - transform.position).normalized;
+        float distanceToTarget = Vector3.Distance(transform.position, targetPosition);
+
+        // Debug direction vector and distance
+        Debug.Log($"Direction vector: {direction}");
+        Debug.Log($"Distance to target: {distanceToTarget}");
+
+        // If the distance is very small, snap to the target position
+        if (distanceToTarget < ReachDistThreshold)
+        {
+            transform.position = targetPosition; // Snap Kim to the target position
+            Debug.Log("Kim snapped to the target position due to small distance.");
+        }
+        else if (direction.magnitude > 0.001f)  // Ensure direction magnitude is non-zero before moving
+        {
+            // Apply movement to Kim based on the direction and speed
+            transform.position += direction * CharacterMoveSpeed * Time.deltaTime;
+            Debug.Log($"Kim moved towards the target. New position: {transform.position}");
         }
         else
         {
@@ -214,6 +247,7 @@ public class Kim : CharacterController
         // Visualize the path
         VisualizePath();
     }
+
 
 
 
@@ -286,23 +320,14 @@ public class Kim : CharacterController
 
 
     // Reset dynamic occupied tiles after each frame
-    private void ResetDynamicOccupiedTiles()
-    {
-        foreach (var tile in dynamicOccupiedTiles)
-        {
-            tile.occupied = false;
-        }
-        dynamicOccupiedTiles.Clear();
-    }
-
-
-    // Mark and visualize the zombie zones
     public void MarkAndVisualizeZombieZones()
     {
-        Collider[] hits = Physics.OverlapSphere(transform.position, contextRadius); // Detect zombies within contextRadius
+        Collider[] hits = Physics.OverlapSphere(transform.position, contextRadius);
 
-        // Reset the danger flag as we no longer use it
-        isInDangerZone = false;
+        bool isKimCloseToOccupiedZone = false;  // Reset the close-to-occupied-zone flag
+
+        // Clear previous dynamic occupied tiles before marking again
+        ResetDynamicOccupiedTiles();
 
         foreach (Collider hit in hits)
         {
@@ -310,21 +335,29 @@ public class Kim : CharacterController
             {
                 Grid.Tile zombieTile = Grid.Instance.GetClosest(hit.transform.position);
 
-                // Mark the occupied zone only (red zone)
-                MarkZombieZones(zombieTile);
+                // Mark and visualize occupied zones (red)
+                MarkZombieZones(zombieTile);  // Handles marking the occupied zones
 
-                // Recalculate the path to avoid the occupied zone
-                Debug.Log("Kim sees a red zone (occupied by zombie). Recalculating path...");
-                RecalculatePath(null, true);  // Avoid the occupied zone
+                // Check if Kim is near an occupied zone
+                isKimCloseToOccupiedZone = IsKimNearOccupiedZone();
             }
+        }
+
+        if (isKimCloseToOccupiedZone)
+        {
+            Debug.Log("Kim is close to an occupied zone! Recalculating path to avoid occupied zones.");
+            RecalculatePath(null, true); // Recalculate path avoiding occupied zones
+        }
+        else
+        {
+            Debug.Log("Kim is safe and not near any occupied zone.");
         }
     }
 
-
-    // Mark and visualize the zones around zombies
+    // Mark and visualize the zones around zombies (only occupied zones)
     private void MarkZombieZones(Grid.Tile zombieTile)
     {
-        // Occupied zone (red) only
+        // Occupied zone (red)
         for (int x = -(int)occupiedZoneRadius; x <= (int)occupiedZoneRadius; x++)
         {
             for (int y = -(int)occupiedZoneRadius; y <= (int)occupiedZoneRadius; y++)
@@ -335,12 +368,42 @@ public class Kim : CharacterController
                     // Mark tile as occupied
                     nearbyTile.occupied = true;
                     dynamicOccupiedTiles.Add(nearbyTile);
-                    // Visualize the red zone
                     Debug.DrawLine(Grid.Instance.WorldPos(nearbyTile), Grid.Instance.WorldPos(nearbyTile) + Vector3.up * 2, Color.red);
                 }
             }
         }
     }
+
+    // Check if Kim is near any occupied zone
+    private bool IsKimNearOccupiedZone()
+    {
+        Grid.Tile currentTile = Grid.Instance.GetClosest(transform.position);
+
+        foreach (Grid.Tile occupiedTile in dynamicOccupiedTiles)
+        {
+            // If Kim is within a tile or two from any occupied zone, she should avoid it
+            if (Vector3.Distance(Grid.Instance.WorldPos(currentTile), Grid.Instance.WorldPos(occupiedTile)) <= occupiedZoneRadius)
+            {
+                Debug.Log("Kim is close to an occupied zone!");
+                return true;
+            }
+        }
+
+        return false;  // Kim is not near any occupied zones
+    }
+
+    // Clear dynamic occupied tiles after recalculating zones
+    private void ResetDynamicOccupiedTiles()
+    {
+        foreach (var tile in dynamicOccupiedTiles)
+        {
+            tile.occupied = false;
+        }
+        dynamicOccupiedTiles.Clear();
+    }
+
+
+
 
 }
 
