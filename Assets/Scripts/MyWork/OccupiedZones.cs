@@ -5,10 +5,11 @@ public class OccupiedZones : MonoBehaviour
 {
     private List<Grid.Tile> occupiedTiles = new List<Grid.Tile>();
     public float dangerRadius = 2.0f; // Define how large the occupied zone should be
+    public float lineHeightMultiplier = 2.0f; // Multiplier to adjust line height dynamically
 
     void Start()
     {
-        InvokeRepeating(nameof(UpdateOccupiedZones), 0f, 2f); // Update occupied zones every 2 seconds
+        InvokeRepeating(nameof(UpdateOccupiedZones), 0f, 0.1f); // More frequent updates for dynamic response
     }
 
     // Call this method every few seconds to recalculate occupied zones
@@ -30,7 +31,9 @@ public class OccupiedZones : MonoBehaviour
             {
                 if (!tile.occupied)
                 {
+                    // Mark tile as occupied
                     occupiedTiles.Add(tile);
+                    MarkZombieZone(tile, zombie.transform.position); // Visualize occupied tiles with dynamic lines
                 }
             }
         }
@@ -56,23 +59,22 @@ public class OccupiedZones : MonoBehaviour
         return tilesInRange;
     }
 
+    // Visualize the occupied zones using Debug.DrawLine with dynamic height based on distance
+    private void MarkZombieZone(Grid.Tile tile, Vector3 zombiePosition)
+    {
+        Vector3 tilePosition = Grid.Instance.WorldPos(tile);
+        float distanceToZombie = Vector3.Distance(tilePosition, zombiePosition);
+
+        // Dynamically adjust the height based on distance to the zombie
+        float dynamicHeight = Mathf.Lerp(0.5f, lineHeightMultiplier, distanceToZombie / dangerRadius);
+
+        // Draw a dynamic vertical red line based on the distance
+        Debug.DrawLine(tilePosition, tilePosition + Vector3.up * dynamicHeight, Color.Lerp(Color.yellow, Color.red, distanceToZombie / dangerRadius), 0.1f); // 0.1f means this line updates every frame
+    }
+
     public List<Grid.Tile> GetOccupiedTiles()
     {
         return occupiedTiles;
     }
 
-    // Visualize the occupied zones using Gizmos
-    void OnDrawGizmos()
-    {
-        Gizmos.color = Color.red; // Set the color of the gizmos
-
-        // Find all zombies in the scene
-        GameObject[] zombies = GameObject.FindGameObjectsWithTag("Zombie");
-
-        foreach (GameObject zombie in zombies)
-        {
-            // Draw a sphere around the zombie to visualize its occupied zone
-            Gizmos.DrawWireSphere(zombie.transform.position, dangerRadius);
-        }
-    }
 }

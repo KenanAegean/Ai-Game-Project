@@ -1864,6 +1864,7 @@ GameObject:
   m_Component:
   - component: {fileID: 4601961738845201628}
   - component: {fileID: 1034124237691063017}
+  - component: {fileID: 4182522264860966978}
   m_Layer: 0
   m_Name: GamesManager
   m_TagString: Untagged
@@ -1906,6 +1907,20 @@ MonoBehaviour:
   - {fileID: 1480322097403426279}
   - {fileID: 1049995173826597518}
   myKim: {fileID: 0}
+  SkipIntro: 1
+--- !u!114 &4182522264860966978
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5867303589464640972}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: be54abd8218e134459a32ac45aa98548, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  dangerRadius: 2
 --- !u!1 &7331442457721142624
 GameObject:
   m_ObjectHideFlags: 0
