@@ -4,7 +4,7 @@ using UnityEngine;
 public class Kim : CharacterController
 {
     [SerializeField] private float occupiedZoneRadius = 2.0f;
-    [SerializeField] private float dangerZoneRadius = 3.0f;
+    //[SerializeField] private float dangerZoneRadius = 3.0f;
     [SerializeField] float contextRadius;
     private Pathfinding pathfinding;
     private List<Grid.Tile> currentPath;
@@ -126,7 +126,7 @@ public class Kim : CharacterController
     }
 
     // Recalculate the path to a target
-    public void RecalculatePath(Grid.Tile targetTile = null, bool avoidDanger = false)
+    public void RecalculatePath(Grid.Tile targetTile = null, bool avoidOccupied = false)
     {
         // If no target is provided, use the closest burger or finish line
         if (targetTile == null)
@@ -136,17 +136,13 @@ public class Kim : CharacterController
 
         Grid.Tile startTile = Grid.Instance.GetClosest(transform.position);
 
-        // Pass the danger zone radius if avoidDanger is true
-        currentPath = pathfinding.FindPath(startTile, targetTile, avoidDanger, dangerZoneRadius);
+        // Pass the occupied zone avoidance flag when recalculating the path
+        currentPath = pathfinding.FindPath(startTile, targetTile, avoidOccupied, occupiedZoneRadius);  // Use occupied zone
 
         if (currentPath == null || currentPath.Count == 0)
         {
-            // If no valid path is found, Kim will wait and try again
             isWaitingForPath = true;
-            Debug.Log("No path found due to obstacles. Waiting for path to clear...");
-
-            // Retry after a delay to see if zombies moved
-            Invoke("RetryRecalculatePath", 1.0f); // Retry after 1 second
+            Debug.Log("No path found. Kim is waiting...");
         }
         else
         {
@@ -166,6 +162,7 @@ public class Kim : CharacterController
         }
     }
 
+
     private void RetryRecalculatePath()
     {
         RecalculatePath(null, true); // Retry by avoiding danger zones again
@@ -176,42 +173,38 @@ public class Kim : CharacterController
     // Move along the current path
     public void MoveAlongPath()
     {
-        // Ensure there's a valid path and that Kim is not waiting
         if (currentPath == null || currentPathIndex >= currentPath.Count || isWaitingForPath)
-        {
-            Debug.LogWarning("No valid path or Kim is waiting.");
             return;
-        }
 
-        // Get the current target tile
         Grid.Tile targetTile = currentPath[currentPathIndex];
         Vector3 targetPosition = Grid.Instance.WorldPos(targetTile);
 
-        // Check if Kim is already at the target position
-        float distanceToTarget = Vector3.Distance(transform.position, targetPosition);
-        if (distanceToTarget < ReachDistThreshold)
-        {
-            // Kim is close enough to the target, move to the next tile
-            currentPathIndex++;
-            Debug.Log($"Reached tile {currentPathIndex}, moving to the next tile...");
-            return;  // Skip further movement calculations and go to the next tile
-        }
+        // Debug target position to ensure we're moving towards a valid point
+        Debug.Log($"Moving towards target position: {targetPosition}");
 
-        // Calculate the direction vector
         Vector3 direction = (targetPosition - transform.position).normalized;
 
-        // Debug target position and direction vector
-        Debug.Log($"Moving towards target position: {targetPosition}");
+        // Debug direction vector
         Debug.Log($"Direction vector: {direction}");
 
-        // Check if the direction vector has a valid magnitude before moving
-        if (direction.magnitude > 0.01f)  // Slightly higher threshold to ensure movement happens
+        // Ensure direction is valid before moving
+        if (direction.magnitude > 0.001f)
         {
-            // Move Kim towards the target tile
+            // Move Kim toward the target tile
             transform.position += direction * CharacterMoveSpeed * Time.deltaTime;
+            float distanceToTarget = Vector3.Distance(transform.position, targetPosition);
 
             // Debug distance to target
             Debug.Log($"Distance to target: {distanceToTarget}");
+
+            // If the distance to the target is small enough, we consider the target "reached"
+            if (distanceToTarget < ReachDistThreshold)
+            {
+                // Snap Kim to the target position and move to the next tile
+                transform.position = targetPosition;
+                currentPathIndex++;
+                Debug.Log($"Reached tile {currentPathIndex}, moving to the next tile...");
+            }
         }
         else
         {
@@ -221,6 +214,7 @@ public class Kim : CharacterController
         // Visualize the path
         VisualizePath();
     }
+
 
 
 
@@ -305,38 +299,32 @@ public class Kim : CharacterController
     // Mark and visualize the zombie zones
     public void MarkAndVisualizeZombieZones()
     {
-        Collider[] hits = Physics.OverlapSphere(transform.position, contextRadius);
+        Collider[] hits = Physics.OverlapSphere(transform.position, contextRadius); // Detect zombies within contextRadius
 
-        isInDangerZone = false;  // Reset the danger zone flag
-
-        Debug.Log("Checking for zombies...");
+        // Reset the danger flag as we no longer use it
+        isInDangerZone = false;
 
         foreach (Collider hit in hits)
         {
             if (hit.CompareTag("Zombie"))
             {
-                Debug.Log("Zombie detected!");
-
                 Grid.Tile zombieTile = Grid.Instance.GetClosest(hit.transform.position);
 
-                // Mark and visualize occupied and danger zones
+                // Mark the occupied zone only (red zone)
                 MarkZombieZones(zombieTile);
-            }
-        }
 
-        if (isInDangerZone)
-        {
-            Debug.Log("Kim is in the danger zone!");
-        }
-        else
-        {
-            Debug.Log("Kim is safe.");
+                // Recalculate the path to avoid the occupied zone
+                Debug.Log("Kim sees a red zone (occupied by zombie). Recalculating path...");
+                RecalculatePath(null, true);  // Avoid the occupied zone
+            }
         }
     }
 
+
+    // Mark and visualize the zones around zombies
     private void MarkZombieZones(Grid.Tile zombieTile)
     {
-        // Occupied zone (red)
+        // Occupied zone (red) only
         for (int x = -(int)occupiedZoneRadius; x <= (int)occupiedZoneRadius; x++)
         {
             for (int y = -(int)occupiedZoneRadius; y <= (int)occupiedZoneRadius; y++)
@@ -347,29 +335,14 @@ public class Kim : CharacterController
                     // Mark tile as occupied
                     nearbyTile.occupied = true;
                     dynamicOccupiedTiles.Add(nearbyTile);
+                    // Visualize the red zone
                     Debug.DrawLine(Grid.Instance.WorldPos(nearbyTile), Grid.Instance.WorldPos(nearbyTile) + Vector3.up * 2, Color.red);
-                }
-            }
-        }
-
-        // Danger zone (yellow)
-        for (int x = -(int)dangerZoneRadius; x <= (int)dangerZoneRadius; x++)
-        {
-            for (int y = -(int)dangerZoneRadius; y <= (int)dangerZoneRadius; y++)
-            {
-                Grid.Tile dangerTile = Grid.Instance.TryGetTile(new Vector2Int(zombieTile.x + x, zombieTile.y + y));
-                if (dangerTile != null && Vector3.Distance(Grid.Instance.WorldPos(dangerTile), transform.position) <= dangerZoneRadius)
-                {
-                    // Instead of blocking the entire zone, check if there's still a possible path
-                    if (!dangerTile.occupied)
-                    {
-                        isInDangerZone = true; // Mark Kim as in danger
-                        Debug.DrawLine(Grid.Instance.WorldPos(dangerTile), Grid.Instance.WorldPos(dangerTile) + Vector3.up * 2, Color.yellow);
-                    }
                 }
             }
         }
     }
 
-
 }
+
+
+
