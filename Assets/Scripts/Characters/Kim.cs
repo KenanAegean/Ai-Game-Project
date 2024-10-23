@@ -59,9 +59,11 @@ public class Kim : CharacterController
                     new IsPathClear(blackboard),
                     new MoveToBurgerAction(this, blackboard),
                     new CheckAndSwitchTarget(this)
-                )
+                ),
+                new RetryMovementIfStuck(this) // New logic to keep retrying movement
             )
         );
+
 
 
         // Set the initial path to the nearest burger and start moving
@@ -139,8 +141,12 @@ public class Kim : CharacterController
 
         if (currentPath == null || currentPath.Count == 0)
         {
+            // If no valid path is found, Kim will wait and try again
             isWaitingForPath = true;
-            Debug.Log("No path found. Kim is waiting...");
+            Debug.Log("No path found due to obstacles. Waiting for path to clear...");
+
+            // Retry after a delay to see if zombies moved
+            Invoke("RetryRecalculatePath", 1.0f); // Retry after 1 second
         }
         else
         {
@@ -160,7 +166,10 @@ public class Kim : CharacterController
         }
     }
 
-
+    private void RetryRecalculatePath()
+    {
+        RecalculatePath(null, true); // Retry by avoiding danger zones again
+    }
 
 
 
@@ -275,8 +284,12 @@ public class Kim : CharacterController
             burgerTiles.Remove(currentTile);
             hasCollectedBurger = true;
             Debug.Log("Kim collected a burger.");
+
+            // Immediately recalculate path to next target
+            SetPathToClosestBurger();
         }
     }
+
 
     // Reset dynamic occupied tiles after each frame
     private void ResetDynamicOccupiedTiles()
@@ -323,8 +336,6 @@ public class Kim : CharacterController
 
     private void MarkZombieZones(Grid.Tile zombieTile)
     {
-        Debug.Log("Marking zombie zones...");
-
         // Occupied zone (red)
         for (int x = -(int)occupiedZoneRadius; x <= (int)occupiedZoneRadius; x++)
         {
@@ -337,8 +348,6 @@ public class Kim : CharacterController
                     nearbyTile.occupied = true;
                     dynamicOccupiedTiles.Add(nearbyTile);
                     Debug.DrawLine(Grid.Instance.WorldPos(nearbyTile), Grid.Instance.WorldPos(nearbyTile) + Vector3.up * 2, Color.red);
-
-                    Debug.Log($"Occupied tile marked at {nearbyTile.x}, {nearbyTile.y}");
                 }
             }
         }
@@ -351,14 +360,16 @@ public class Kim : CharacterController
                 Grid.Tile dangerTile = Grid.Instance.TryGetTile(new Vector2Int(zombieTile.x + x, zombieTile.y + y));
                 if (dangerTile != null && Vector3.Distance(Grid.Instance.WorldPos(dangerTile), transform.position) <= dangerZoneRadius)
                 {
-                    // Mark Kim as being in the danger zone
-                    isInDangerZone = true;
-                    Debug.DrawLine(Grid.Instance.WorldPos(dangerTile), Grid.Instance.WorldPos(dangerTile) + Vector3.up * 2, Color.yellow);
-
-                    Debug.Log($"Danger tile marked at {dangerTile.x}, {dangerTile.y}");
+                    // Instead of blocking the entire zone, check if there's still a possible path
+                    if (!dangerTile.occupied)
+                    {
+                        isInDangerZone = true; // Mark Kim as in danger
+                        Debug.DrawLine(Grid.Instance.WorldPos(dangerTile), Grid.Instance.WorldPos(dangerTile) + Vector3.up * 2, Color.yellow);
+                    }
                 }
             }
         }
     }
+
 
 }

@@ -112,6 +112,49 @@ public class RecalculatePathToAvoidDanger : BehaviorNode
     }
 }
 
+// Node: Retry movement if Kim is stuck
+public class RetryMovementIfStuck : BehaviorNode
+{
+    private Kim kim;
+    private float stuckCheckInterval = 2.0f; // Check every 2 seconds
+    private Vector3 lastPosition;
+    private float timeSinceLastMove;
+
+    public RetryMovementIfStuck(Kim kim)
+    {
+        this.kim = kim;
+        this.lastPosition = kim.transform.position;
+        this.timeSinceLastMove = 0f;
+    }
+
+    public override bool Execute()
+    {
+        // Check if Kim's position has changed since the last check
+        if (Vector3.Distance(kim.transform.position, lastPosition) < 0.1f)
+        {
+            timeSinceLastMove += Time.deltaTime;
+
+            // If Kim has been stuck for too long, force a path recalculation
+            if (timeSinceLastMove >= stuckCheckInterval)
+            {
+                Debug.Log("Kim is stuck, retrying path calculation...");
+                kim.RecalculatePath(null, true); // Recalculate path avoiding danger zones
+                timeSinceLastMove = 0f; // Reset the stuck timer
+                return true; // Kim was stuck, path recalculation triggered
+            }
+        }
+        else
+        {
+            // Kim is moving, reset the stuck timer and position check
+            timeSinceLastMove = 0f;
+            lastPosition = kim.transform.position;
+        }
+
+        return false; // No need to retry, Kim is not stuck
+    }
+}
+
+
 
 
 // Node: Check if the path is clear of obstacles
