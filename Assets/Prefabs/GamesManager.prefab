@@ -1920,7 +1920,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: be54abd8218e134459a32ac45aa98548, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  dangerRadius: 2
+  dangerRadius: 2.5
+  lineHeightMultiplier: 1.5
 --- !u!1 &7331442457721142624
 GameObject:
   m_ObjectHideFlags: 0

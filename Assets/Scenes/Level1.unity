@@ -10749,51 +10749,6 @@ PrefabInstance:
       propertyPath: m_Name
       value: Kim
       objectReference: {fileID: 0}
-    - target: {fileID: 632668819260136286, guid: e74821599e1428f4fb096b33ee329de8,
-        type: 3}
-      propertyPath: m_IsActive
-      value: 1
-      objectReference: {fileID: 0}
-    - target: {fileID: 3846718407826640484, guid: e74821599e1428f4fb096b33ee329de8,
-        type: 3}
-      propertyPath: FleeRadius
-      value: 3
-      objectReference: {fileID: 0}
-    - target: {fileID: 3846718407826640484, guid: e74821599e1428f4fb096b33ee329de8,
-        type: 3}
-      propertyPath: FleeDistance
-      value: 2
-      objectReference: {fileID: 0}
-    - target: {fileID: 3846718407826640484, guid: e74821599e1428f4fb096b33ee329de8,
-        type: 3}
-      propertyPath: ContextRadius
-      value: 1
-      objectReference: {fileID: 0}
-    - target: {fileID: 3846718407826640484, guid: e74821599e1428f4fb096b33ee329de8,
-        type: 3}
-      propertyPath: contextRadius
-      value: 5
-      objectReference: {fileID: 0}
-    - target: {fileID: 3846718407826640484, guid: e74821599e1428f4fb096b33ee329de8,
-        type: 3}
-      propertyPath: dangerZoneRadius
-      value: 4
-      objectReference: {fileID: 0}
-    - target: {fileID: 3846718407826640484, guid: e74821599e1428f4fb096b33ee329de8,
-        type: 3}
-      propertyPath: ReachDistThreshold
-      value: 0.2
-      objectReference: {fileID: 0}
-    - target: {fileID: 3846718407826640484, guid: e74821599e1428f4fb096b33ee329de8,
-        type: 3}
-      propertyPath: occupiedZoneRadius
-      value: 2
-      objectReference: {fileID: 0}
-    - target: {fileID: 3846718407826640484, guid: e74821599e1428f4fb096b33ee329de8,
-        type: 3}
-      propertyPath: pathRecalculationInterval
-      value: 0.2
-      objectReference: {fileID: 0}
     - target: {fileID: 8486096355810131729, guid: e74821599e1428f4fb096b33ee329de8,
         type: 3}
       propertyPath: m_LocalPosition.x
@@ -17544,7 +17499,7 @@ PrefabInstance:
     - target: {fileID: 4182522264860966978, guid: 078ac4cfd02656d4eafd0ef44e98033a,
         type: 3}
       propertyPath: dangerRadius
-      value: 2
+      value: 2.5
       objectReference: {fileID: 0}
     - target: {fileID: 4601961738845201628, guid: 078ac4cfd02656d4eafd0ef44e98033a,
         type: 3}
