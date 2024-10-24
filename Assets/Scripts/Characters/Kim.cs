@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 
 public class Kim : CharacterController
@@ -8,12 +9,16 @@ public class Kim : CharacterController
     private List<Grid.Tile> currentPath;
 
     // Store burger and finish line positions
-    public List<Grid.Tile> targets { get; private set; }
+    public List<Grid.Tile> allBurgers { get; private set; }
+    public List<Grid.Tile> remainingBurgers { get; private set; }
     public Grid.Tile finishTile { get; private set; }
 
     // Behavior tree
     private BehaviorTree behaviorTree;
     private OccupiedZones occupiedZones;
+
+    // Keep track of blocked burgers
+    private List<Grid.Tile> blockedBurgers = new List<Grid.Tile>();
 
     public override void StartCharacter()
     {
@@ -27,10 +32,9 @@ public class Kim : CharacterController
         occupiedZones = GameObject.FindObjectOfType<OccupiedZones>(); // Reference to the occupied zones
 
         // Store all burger positions at the start
-        targets = GetAllBurgerTiles();
+        allBurgers = GetAllBurgerTiles();
+        remainingBurgers = new List<Grid.Tile>(allBurgers);
         finishTile = Grid.Instance.GetFinishTile();
-
-        targets.Add(finishTile); // Always add the finish tile as the last target
 
         // Initialize the behavior tree
         behaviorTree = new BehaviorTree(
@@ -38,17 +42,18 @@ public class Kim : CharacterController
                 // Collect Burgers Sequence
                 new Sequence(
                     new ConditionNode("AreBurgersLeft", AreBurgersLeft),
-                    new ActionNode("SetPathToClosestBurger", SetPathToClosestBurger),
+                    new ActionNode("SetPathToAvailableBurger", SetPathToAvailableBurger),
                     new Selector(
                         new Sequence(
                             new ConditionNode("IsPathAvailable", IsPathAvailable),
                             new ActionNode("MoveAlongPath", MoveAlongPath)
                         ),
-                        new ActionNode("Wait", Wait)
+                        new ActionNode("WaitOrTryNextBurger", WaitOrTryNextBurger)
                     )
                 ),
                 // Go to Finish Line Sequence
                 new Sequence(
+                    new ConditionNode("AllBurgersCollected", AllBurgersCollected),
                     new ActionNode("SetPathToFinishLine", SetPathToFinishLine),
                     new Selector(
                         new Sequence(
@@ -79,20 +84,48 @@ public class Kim : CharacterController
     // Behavior Tree Methods
     private bool AreBurgersLeft()
     {
-        return targets != null && targets.Count > 1; // More than one means burgers are still left
+        return remainingBurgers != null && remainingBurgers.Count > 0;
     }
 
-    private Node.State SetPathToClosestBurger()
+    private bool AllBurgersCollected()
     {
-        Grid.Tile closestBurger = GetClosestBurgerTile();
-        if (closestBurger != null)
+        return remainingBurgers != null && remainingBurgers.Count == 0;
+    }
+
+    private Node.State SetPathToAvailableBurger()
+    {
+        Grid.Tile nextBurger = GetNextAvailableBurgerTile();
+        if (nextBurger != null)
         {
-            RecalculatePath(closestBurger);
+            RecalculatePath(nextBurger);
             return Node.State.Success;
         }
         else
         {
             return Node.State.Failure;
+        }
+    }
+
+    private Node.State WaitOrTryNextBurger()
+    {
+        // Add the current target to blocked burgers
+        if (currentTarget != null && !blockedBurgers.Contains(currentTarget))
+        {
+            blockedBurgers.Add(currentTarget);
+        }
+
+        // Try to find another burger
+        Grid.Tile nextBurger = GetNextAvailableBurgerTile();
+        if (nextBurger != null)
+        {
+            RecalculatePath(nextBurger);
+            return Node.State.Running;
+        }
+        else
+        {
+            // All burgers are blocked, Kim waits
+            Debug.Log("All burgers are blocked. Kim is waiting.");
+            return Node.State.Running;
         }
     }
 
@@ -129,6 +162,8 @@ public class Kim : CharacterController
         return Node.State.Running;
     }
 
+    private Grid.Tile currentTarget = null;
+
     public void RecalculatePath(Grid.Tile targetTile = null)
     {
         if (targetTile == null)
@@ -137,6 +172,8 @@ public class Kim : CharacterController
             return;
         }
 
+        currentTarget = targetTile;
+
         Grid.Tile startTile = Grid.Instance.GetClosest(transform.position);
 
         // Recalculate the path to avoid the occupied zones
@@ -144,13 +181,13 @@ public class Kim : CharacterController
 
         if (currentPath == null || currentPath.Count == 0)
         {
-            Debug.Log("No path available. Kim will wait for zombies to move away.");
+            Debug.Log($"No path available to tile ({targetTile.x}, {targetTile.y}).");
             // Clear the walk buffer to stop movement
             SetWalkBuffer(new List<Grid.Tile>());
         }
         else
         {
-            // **Remove the starting tile if it's the same as the current tile**
+            // Remove the starting tile if it's the same as the current tile
             if (Grid.Instance.IsSameTile(startTile, currentPath[0]))
             {
                 currentPath.RemoveAt(0);
@@ -166,7 +203,7 @@ public class Kim : CharacterController
 
             // Set walk buffer using the newly calculated path
             SetWalkBuffer(currentPath);  // This will handle clearing the buffer
-            Debug.Log("Kim's path recalculated. Starting movement.");
+            Debug.Log($"Kim's path recalculated to tile ({targetTile.x}, {targetTile.y}). Starting movement.");
             myReachedTile = true;
 
             // Log the recalculated path
@@ -184,9 +221,10 @@ public class Kim : CharacterController
     public void CheckIfCollectedTarget()
     {
         Grid.Tile currentTile = Grid.Instance.GetClosest(transform.position);
-        if (targets.Contains(currentTile))
+        if (remainingBurgers.Contains(currentTile))
         {
-            targets.Remove(currentTile);
+            remainingBurgers.Remove(currentTile);
+            blockedBurgers.Remove(currentTile);
             Debug.Log("Kim collected a burger.");
 
             // Immediately recalculate path to next target
@@ -211,27 +249,33 @@ public class Kim : CharacterController
         return targets;
     }
 
-    // Get the closest burger tile (ignore the finish tile)
-    public Grid.Tile GetClosestBurgerTile()
+    // Get the next available burger tile
+    public Grid.Tile GetNextAvailableBurgerTile()
     {
-        Grid.Tile closestBurgerTile = null;
-        float shortestDistance = float.MaxValue;
-
-        // Ignore the last item (which is the finish tile)
-        for (int i = 0; i < targets.Count - 1; i++)
+        foreach (var burgerTile in remainingBurgers)
         {
-            Grid.Tile burgerTile = targets[i];
-            float distance = Vector3.Distance(transform.position, Grid.Instance.WorldPos(burgerTile));
+            // Skip blocked burgers
+            if (blockedBurgers.Contains(burgerTile))
+                continue;
 
-            if (distance < shortestDistance)
+            // Check if a path is available
+            Grid.Tile startTile = Grid.Instance.GetClosest(transform.position);
+            List<Grid.Tile> path = pathfinding.FindPath(startTile, burgerTile);
+
+            if (path != null && path.Count > 0)
             {
-                shortestDistance = distance;
-                closestBurgerTile = burgerTile;
+                return burgerTile;
+            }
+            else
+            {
+                // Mark this burger as blocked
+                if (!blockedBurgers.Contains(burgerTile))
+                    blockedBurgers.Add(burgerTile);
             }
         }
 
-        Debug.Log($"Closest Burger Tile: {closestBurgerTile?.x}, {closestBurgerTile?.y}");
-        return closestBurgerTile;
+        // No available burgers found
+        return null;
     }
 
     // Visualize the path
