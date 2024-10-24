@@ -17,7 +17,7 @@ public class Kim : CharacterController
 
     private List<Grid.Tile> blockedBurgers = new List<Grid.Tile>();
 
-    private float retryBlockedBurgersInterval = 2.0f; // in seconds
+    private float retryBlockedBurgersInterval = 2.0f;
     private float retryBlockedBurgersTimer = 0.0f;
 
     public override void StartCharacter()
