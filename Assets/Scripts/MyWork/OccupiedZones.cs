@@ -19,6 +19,7 @@ public class OccupiedZones : MonoBehaviour
 
         // Find all zombies in the scene
         GameObject[] zombies = GameObject.FindGameObjectsWithTag("Zombie");
+        Debug.Log($"Number of zombies: {zombies.Length}");
 
         foreach (GameObject zombie in zombies)
         {
@@ -27,9 +28,11 @@ public class OccupiedZones : MonoBehaviour
 
             // Mark the surrounding tiles within the dangerRadius as occupied
             List<Grid.Tile> dangerTiles = GetTilesWithinRadius(zombieTile, dangerRadius);
+            Debug.Log($"Zombie at ({zombieTile.x}, {zombieTile.y}) occupies {dangerTiles.Count} tiles.");
+
             foreach (Grid.Tile tile in dangerTiles)
             {
-                if (!tile.occupied)
+                if (!tile.occupied && !occupiedTiles.Contains(tile))
                 {
                     // Mark tile as occupied
                     occupiedTiles.Add(tile);
@@ -37,6 +40,8 @@ public class OccupiedZones : MonoBehaviour
                 }
             }
         }
+
+        Debug.Log($"Total occupied tiles: {occupiedTiles.Count}");
     }
 
     // Utility method to get tiles within a radius

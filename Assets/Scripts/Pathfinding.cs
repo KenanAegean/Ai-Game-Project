@@ -25,6 +25,18 @@ public class Pathfinding
         gScore[startTile] = 0;
         fScore[startTile] = GetHeuristic(startTile, targetTile);
 
+        Debug.Log($"Starting pathfinding from ({startTile.x}, {startTile.y}) to ({targetTile.x}, {targetTile.y})");
+
+        // If the start or target tile is in danger tiles, log a warning
+        if (dangerTiles.Contains(startTile))
+        {
+            Debug.LogWarning("Start tile is in a danger zone!");
+        }
+        if (dangerTiles.Contains(targetTile))
+        {
+            Debug.LogWarning("Target tile is in a danger zone!");
+        }
+
         while (openSet.Count > 0)
         {
             Grid.Tile currentTile = GetLowestFScoreTile(openSet, fScore);
