@@ -9,6 +9,7 @@ using UnityEngine;
 //| |___| |__| |_| |/ ___ | |___  | |   | |__| |_| | |_| | |___           
 //|_____|_____\____/_/   \_\____| |_|    \____\___/|____/|_____|          
 
+
 // ____   ___    _   _  ___ _____    ____ _   _    _    _   _  ____ _____ 
 //|  _ \ / _ \  | \ | |/ _ |_   _|  / ___| | | |  / \  | \ | |/ ___| ____|
 //| | | | | | | |  \| | | | || |   | |   | |_| | / _ \ |  \| | |  _|  _|  
@@ -26,50 +27,32 @@ public class CharacterController : MonoBehaviour
     protected bool myReachedDestination = false;
     protected List<Grid.Tile> myWalkBuffer = new List<Grid.Tile>();
 
-    private Transform model = null;
+    Transform model = null;
 
     public virtual void UpdateCharacter()
     {
-        if (myCurrentTile != null)
-        {
-            Vector3 tilePosition = Grid.Instance.WorldPos(myCurrentTile);
-            myReachedTile = Vector3.Distance(transform.position, tilePosition) < ReachDistThreshold;
-            transform.position = Vector3.MoveTowards(transform.position, tilePosition, CharacterMoveSpeed * Time.deltaTime);
-        }
+        Vector3 tilePosition = new Vector3();
+        if (myCurrentTile != null) tilePosition = Grid.Instance.WorldPos(myCurrentTile);
+        myReachedTile = Vector3.Distance(transform.position, tilePosition) < ReachDistThreshold;
+        transform.position = Vector3.MoveTowards(transform.position, tilePosition, CharacterMoveSpeed * Time.deltaTime);
 
         myReachedDestination = myWalkBuffer.Count == 0;
 
         if (myWalkBuffer.Count > 0)
         {
             Grid.Tile t = myWalkBuffer.ElementAt(0);
-            if (!t.occupied)
-            {
-                MoveTile(t);
-            }
+            if (!t.occupied) MoveTile(myWalkBuffer.ElementAt(0));
 
             myAnimator.SetBool("Walk", true);
+            SetForward((Grid.Instance.WorldPos(myWalkBuffer.ElementAt(0)) - myAnimator.transform.position).normalized);
 
-            Vector3 targetPosition = Grid.Instance.WorldPos(t);
-            Vector3 currentPosition = transform.position;
-            Vector3 direction = (targetPosition - currentPosition).normalized;
-
-            // Debug log to check the direction vector
-            Debug.Log($"UpdateCharacter: targetPosition={targetPosition}, currentPosition={currentPosition}, direction={direction}");
-
-            SetForward(direction);
-
-            if (myReachedTile && myCurrentTile == t)
-            {
-                myWalkBuffer.RemoveAt(0);
-                myReachedTile = false; // Reset reached tile for the next tile
-            }
+            if (myReachedTile && myCurrentTile == t) myWalkBuffer.RemoveAt(0);
         }
         else if (myReachedTile)
         {
             myAnimator.SetBool("Walk", false);
         }
     }
-
     public virtual void StartCharacter() { }
 
     void Start()
@@ -77,42 +60,21 @@ public class CharacterController : MonoBehaviour
         myCurrentTile = Grid.Instance.GetClosest(transform.position);
         myAnimator = GetComponentInChildren<Animator>();
 
-        if (myAnimator == null)
-        {
-            Debug.LogError("Animator component not found in children.");
-        }
-
-        // Ensure model is correctly assigned
-        model = myAnimator.transform;
-
-        if (model == null)
-        {
-            Debug.LogError("Model transform not found.");
-        }
+        model = transform.GetChild(0).transform;
     }
-
-    void SetForward(Vector3 forward)
+    public void SetForward(Vector3 forward)
     {
         Vector3 newForward = forward;
-        newForward.y = 0;  // Keep the character facing horizontally
+        newForward.y = 0;
 
-        // Debug log to check the forward vector
-        Debug.Log($"SetForward called with forward vector: {forward}, newForward: {newForward}, magnitude: {newForward.magnitude}");
-
-        if (newForward.sqrMagnitude > 0.0001f) // Check if the vector is not zero
+        // Ensure the forward vector is not zero
+        if (newForward.magnitude > 0.001f)
         {
-            if (model != null)
-            {
-                model.forward = newForward.normalized;
-            }
-            else
-            {
-                Debug.LogWarning("Model is null, cannot set forward direction.");
-            }
+            model.forward = newForward.normalized;
         }
         else
         {
-            Debug.LogWarning("Look rotation viewing vector is zero, skipping rotation.");
+            Debug.LogWarning("Look rotation viewing vector is zero. Not updating forward direction.");
         }
     }
 
@@ -129,6 +91,5 @@ public class CharacterController : MonoBehaviour
     {
         myWalkBuffer.Clear();
         myWalkBuffer.AddRange(someTiles);
-        Debug.Log($"Walk buffer set with {myWalkBuffer.Count} tiles.");
     }
 }

@@ -20,6 +20,10 @@ public class Kim : CharacterController
     // Keep track of blocked burgers
     private List<Grid.Tile> blockedBurgers = new List<Grid.Tile>();
 
+    // Timer to periodically retry blocked burgers
+    private float retryBlockedBurgersInterval = 2.0f; // in seconds
+    private float retryBlockedBurgersTimer = 0.0f;
+
     public override void StartCharacter()
     {
         base.StartCharacter();
@@ -36,27 +40,27 @@ public class Kim : CharacterController
         remainingBurgers = new List<Grid.Tile>(allBurgers);
         finishTile = Grid.Instance.GetFinishTile();
 
-        // Initialize the behavior tree
+        // Initialize the behavior tree with adjusted structure
         behaviorTree = new BehaviorTree(
             new Selector(
                 // Collect Burgers Sequence
                 new Sequence(
                     new ConditionNode("AreBurgersLeft", AreBurgersLeft),
-                    new ActionNode("SetPathToAvailableBurger", SetPathToAvailableBurger),
                     new Selector(
                         new Sequence(
+                            new ActionNode("SetPathToAvailableBurger", SetPathToAvailableBurger),
                             new ConditionNode("IsPathAvailable", IsPathAvailable),
                             new ActionNode("MoveAlongPath", MoveAlongPath)
                         ),
-                        new ActionNode("WaitOrTryNextBurger", WaitOrTryNextBurger)
+                        new ActionNode("WaitOrRetryBlockedBurgers", WaitOrRetryBlockedBurgers)
                     )
                 ),
                 // Go to Finish Line Sequence
                 new Sequence(
                     new ConditionNode("AllBurgersCollected", AllBurgersCollected),
-                    new ActionNode("SetPathToFinishLine", SetPathToFinishLine),
                     new Selector(
                         new Sequence(
+                            new ActionNode("SetPathToFinishLine", SetPathToFinishLine),
                             new ConditionNode("IsPathAvailable", IsPathAvailable),
                             new ActionNode("MoveAlongPath", MoveAlongPath)
                         ),
@@ -72,6 +76,9 @@ public class Kim : CharacterController
 
     public override void UpdateCharacter()
     {
+        // Update retry timer
+        retryBlockedBurgersTimer += Time.deltaTime;
+
         // Execute the behavior tree
         behaviorTree.Execute();
 
@@ -106,25 +113,37 @@ public class Kim : CharacterController
         }
     }
 
-    private Node.State WaitOrTryNextBurger()
+    private Node.State WaitOrRetryBlockedBurgers()
     {
-        // Add the current target to blocked burgers
-        if (currentTarget != null && !blockedBurgers.Contains(currentTarget))
+        // If the retry timer exceeds the interval, attempt to retry blocked burgers
+        if (retryBlockedBurgersTimer >= retryBlockedBurgersInterval)
         {
-            blockedBurgers.Add(currentTarget);
-        }
+            retryBlockedBurgersTimer = 0.0f;
+            blockedBurgers.Clear(); // Clear blocked burgers to retry them
 
-        // Try to find another burger
-        Grid.Tile nextBurger = GetNextAvailableBurgerTile();
-        if (nextBurger != null)
-        {
-            RecalculatePath(nextBurger);
-            return Node.State.Running;
+            Debug.Log("Retrying blocked burgers.");
+
+            // Attempt to set a path to any available burger again
+            Grid.Tile nextBurger = GetNextAvailableBurgerTile();
+            if (nextBurger != null)
+            {
+                RecalculatePath(nextBurger);
+                return Node.State.Running;
+            }
+            else
+            {
+                // Still no available burgers, Kim waits
+                Debug.Log("No available burgers after retrying. Kim continues waiting.");
+                return Node.State.Running;
+            }
         }
         else
         {
-            // All burgers are blocked, Kim waits
-            Debug.Log("All burgers are blocked. Kim is waiting.");
+            // Kim waits for the retry interval
+            Debug.Log("Kim is waiting for blocked burgers to become available.");
+            // Ensure Kim doesn't move
+            myReachedTile = true;
+            SetWalkBuffer(new List<Grid.Tile>());
             return Node.State.Running;
         }
     }
@@ -144,7 +163,7 @@ public class Kim : CharacterController
     {
         if (currentPath == null || currentPath.Count == 0)
         {
-            return Node.State.Success;
+            return Node.State.Failure;
         }
 
         // Movement is handled in base.UpdateCharacter(), which uses myWalkBuffer
@@ -159,6 +178,9 @@ public class Kim : CharacterController
     {
         // Kim waits for zombies to move away
         Debug.Log("Kim is waiting for zombies to move away.");
+        // Ensure Kim doesn't move
+        myReachedTile = true;
+        SetWalkBuffer(new List<Grid.Tile>());
         return Node.State.Running;
     }
 
@@ -184,6 +206,13 @@ public class Kim : CharacterController
             Debug.Log($"No path available to tile ({targetTile.x}, {targetTile.y}).");
             // Clear the walk buffer to stop movement
             SetWalkBuffer(new List<Grid.Tile>());
+            myReachedTile = true;
+
+            // Mark this burger as blocked if it's a burger
+            if (remainingBurgers.Contains(targetTile) && !blockedBurgers.Contains(targetTile))
+            {
+                blockedBurgers.Add(targetTile);
+            }
         }
         else
         {
@@ -198,6 +227,7 @@ public class Kim : CharacterController
                 // No tiles to move to
                 Debug.Log("No tiles to move to after removing the starting tile.");
                 SetWalkBuffer(new List<Grid.Tile>());
+                myReachedTile = true;
                 return;
             }
 
@@ -281,7 +311,7 @@ public class Kim : CharacterController
     // Visualize the path
     private void VisualizePath()
     {
-        if (currentPath != null)
+        if (currentPath != null && currentPath.Count > 0)
         {
             for (int i = 0; i < currentPath.Count - 1; i++)
             {
