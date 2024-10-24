@@ -8,19 +8,15 @@ public class Kim : CharacterController
     private Pathfinding pathfinding;
     private List<Grid.Tile> currentPath;
 
-    // Store burger and finish line positions
     public List<Grid.Tile> allBurgers { get; private set; }
     public List<Grid.Tile> remainingBurgers { get; private set; }
     public Grid.Tile finishTile { get; private set; }
 
-    // Behavior tree
     private BehaviorTree behaviorTree;
     private OccupiedZones occupiedZones;
 
-    // Keep track of blocked burgers
     private List<Grid.Tile> blockedBurgers = new List<Grid.Tile>();
 
-    // Timer to periodically retry blocked burgers
     private float retryBlockedBurgersInterval = 2.0f; // in seconds
     private float retryBlockedBurgersTimer = 0.0f;
 
@@ -28,19 +24,16 @@ public class Kim : CharacterController
     {
         base.StartCharacter();
 
-        // Ensure that myReachedTile is true at the start
         myReachedTile = true;
 
-        // Initialize pathfinding and occupied zones
         pathfinding = new Pathfinding(Grid.Instance);
         occupiedZones = GameObject.FindObjectOfType<OccupiedZones>(); // Reference to the occupied zones
 
-        // Store all burger positions at the start
         allBurgers = GetAllBurgerTiles();
         remainingBurgers = new List<Grid.Tile>(allBurgers);
         finishTile = Grid.Instance.GetFinishTile();
 
-        // Initialize the behavior tree with adjusted structure
+        // Initialize the behavior tree
         behaviorTree = new BehaviorTree(
             new Selector(
                 // Collect Burgers Sequence
@@ -70,21 +63,17 @@ public class Kim : CharacterController
             )
         );
 
-        // Start moving by executing the behavior tree
         behaviorTree.Execute();
     }
 
     public override void UpdateCharacter()
     {
-        // Update retry timer
         retryBlockedBurgersTimer += Time.deltaTime;
 
-        // Execute the behavior tree
         behaviorTree.Execute();
 
         base.UpdateCharacter();
 
-        // Check if Kim has collected the target (burger)
         CheckIfCollectedTarget();
     }
 
@@ -119,9 +108,7 @@ public class Kim : CharacterController
         if (retryBlockedBurgersTimer >= retryBlockedBurgersInterval)
         {
             retryBlockedBurgersTimer = 0.0f;
-            blockedBurgers.Clear(); // Clear blocked burgers to retry them
-
-            Debug.Log("Retrying blocked burgers.");
+            blockedBurgers.Clear();
 
             // Attempt to set a path to any available burger again
             Grid.Tile nextBurger = GetNextAvailableBurgerTile();
@@ -132,16 +119,13 @@ public class Kim : CharacterController
             }
             else
             {
-                // Still no available burgers, Kim waits
-                Debug.Log("No available burgers after retrying. Kim continues waiting.");
+                // No available burgers, Kim waits
                 return Node.State.Running;
             }
         }
         else
         {
-            // Kim waits for the retry interval
-            Debug.Log("Kim is waiting for blocked burgers to become available.");
-            // Ensure Kim doesn't move
+            // Kim waiting for blocked burgers to become available
             myReachedTile = true;
             SetWalkBuffer(new List<Grid.Tile>());
             return Node.State.Running;
@@ -166,9 +150,6 @@ public class Kim : CharacterController
             return Node.State.Failure;
         }
 
-        // Movement is handled in base.UpdateCharacter(), which uses myWalkBuffer
-
-        // Visualize the path
         VisualizePath();
 
         return Node.State.Running;
@@ -177,8 +158,6 @@ public class Kim : CharacterController
     private Node.State Wait()
     {
         // Kim waits for zombies to move away
-        Debug.Log("Kim is waiting for zombies to move away.");
-        // Ensure Kim doesn't move
         myReachedTile = true;
         SetWalkBuffer(new List<Grid.Tile>());
         return Node.State.Running;
@@ -204,7 +183,6 @@ public class Kim : CharacterController
         if (currentPath == null || currentPath.Count == 0)
         {
             Debug.Log($"No path available to tile ({targetTile.x}, {targetTile.y}).");
-            // Clear the walk buffer to stop movement
             SetWalkBuffer(new List<Grid.Tile>());
             myReachedTile = true;
 
@@ -216,7 +194,6 @@ public class Kim : CharacterController
         }
         else
         {
-            // Remove the starting tile if it's the same as the current tile
             if (Grid.Instance.IsSameTile(startTile, currentPath[0]))
             {
                 currentPath.RemoveAt(0);
@@ -224,19 +201,16 @@ public class Kim : CharacterController
 
             if (currentPath.Count == 0)
             {
-                // No tiles to move to
-                Debug.Log("No tiles to move to after removing the starting tile.");
+                // No tiles to move 
                 SetWalkBuffer(new List<Grid.Tile>());
                 myReachedTile = true;
                 return;
             }
 
-            // Set walk buffer using the newly calculated path
-            SetWalkBuffer(currentPath);  // This will handle clearing the buffer
+            SetWalkBuffer(currentPath);
             Debug.Log($"Kim's path recalculated to tile ({targetTile.x}, {targetTile.y}). Starting movement.");
             myReachedTile = true;
 
-            // Log the recalculated path
             if (debugMode)
             {
                 Debug.Log("Recalculated path:");
@@ -257,8 +231,7 @@ public class Kim : CharacterController
             blockedBurgers.Remove(currentTile);
             Debug.Log("Kim collected a burger.");
 
-            // Immediately recalculate path to next target
-            behaviorTree.Execute(); // Re-run the behavior tree to update the path
+            behaviorTree.Execute();
         }
     }
 
@@ -279,7 +252,6 @@ public class Kim : CharacterController
         return targets;
     }
 
-    // Get the next available burger tile
     public Grid.Tile GetNextAvailableBurgerTile()
     {
         foreach (var burgerTile in remainingBurgers)
@@ -288,7 +260,7 @@ public class Kim : CharacterController
             if (blockedBurgers.Contains(burgerTile))
                 continue;
 
-            // Check if a path is available
+            // Check if a path available
             Grid.Tile startTile = Grid.Instance.GetClosest(transform.position);
             List<Grid.Tile> path = pathfinding.FindPath(startTile, burgerTile);
 
@@ -298,17 +270,15 @@ public class Kim : CharacterController
             }
             else
             {
-                // Mark this burger as blocked
                 if (!blockedBurgers.Contains(burgerTile))
                     blockedBurgers.Add(burgerTile);
             }
         }
 
-        // No available burgers found
+        // No available burgers
         return null;
     }
 
-    // Visualize the path
     private void VisualizePath()
     {
         if (currentPath != null && currentPath.Count > 0)

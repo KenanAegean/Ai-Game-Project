@@ -10754,6 +10754,11 @@ PrefabInstance:
       propertyPath: debugMode
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 3846718407826640484, guid: e74821599e1428f4fb096b33ee329de8,
+        type: 3}
+      propertyPath: recalculationInterval
+      value: 5
+      objectReference: {fileID: 0}
     - target: {fileID: 8486096355810131729, guid: e74821599e1428f4fb096b33ee329de8,
         type: 3}
       propertyPath: m_LocalPosition.x

@@ -4,20 +4,18 @@ public class Blackboard
 {
     private Dictionary<string, object> data = new Dictionary<string, object>();
 
-    // Method to store data in the blackboard
     public void Set(string key, object value)
     {
         if (data.ContainsKey(key))
         {
-            data[key] = value; // Update if the key already exists
+            data[key] = value;
         }
         else
         {
-            data.Add(key, value); // Add new key-value pair
+            data.Add(key, value);
         }
     }
 
-    // Method to retrieve data from the blackboard
     public T Get<T>(string key)
     {
         if (data.ContainsKey(key))
@@ -27,7 +25,6 @@ public class Blackboard
         return default;
     }
 
-    // Check if the blackboard contains a key
     public bool ContainsKey(string key)
     {
         return data.ContainsKey(key);

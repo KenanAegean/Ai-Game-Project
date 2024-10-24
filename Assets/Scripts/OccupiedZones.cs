@@ -4,29 +4,26 @@ using UnityEngine;
 public class OccupiedZones : MonoBehaviour
 {
     private List<Grid.Tile> occupiedTiles = new List<Grid.Tile>();
-    public float dangerRadius = 2.0f; // Define how large the occupied zone should be
-    public float lineHeightMultiplier = 2.0f; // Multiplier to adjust line height dynamically
+    public float dangerRadius = 2.0f;
+    public float lineHeightMultiplier = 2.0f;
 
     void Start()
     {
-        InvokeRepeating(nameof(UpdateOccupiedZones), 0f, 0.1f); // More frequent updates for dynamic response
+        InvokeRepeating(nameof(UpdateOccupiedZones), 0f, 0.1f);
     }
 
-    // Call this method every few seconds to recalculate occupied zones
     void UpdateOccupiedZones()
     {
-        occupiedTiles.Clear(); // Clear previous occupied zones
+        occupiedTiles.Clear();
 
-        // Find all zombies in the scene
         GameObject[] zombies = GameObject.FindGameObjectsWithTag("Zombie");
         Debug.Log($"Number of zombies: {zombies.Length}");
 
         foreach (GameObject zombie in zombies)
         {
-            // Get the tile position of the zombie
             Grid.Tile zombieTile = Grid.Instance.GetClosest(zombie.transform.position);
 
-            // Mark the surrounding tiles within the dangerRadius as occupied
+            // Mark the surrounding tiles as occupied
             List<Grid.Tile> dangerTiles = GetTilesWithinRadius(zombieTile, dangerRadius);
             Debug.Log($"Zombie at ({zombieTile.x}, {zombieTile.y}) occupies {dangerTiles.Count} tiles.");
 
@@ -34,9 +31,8 @@ public class OccupiedZones : MonoBehaviour
             {
                 if (!tile.occupied && !occupiedTiles.Contains(tile))
                 {
-                    // Mark tile as occupied
                     occupiedTiles.Add(tile);
-                    MarkZombieZone(tile, zombie.transform.position); // Visualize occupied tiles with dynamic lines
+                    MarkZombieZone(tile, zombie.transform.position);
                 }
             }
         }
@@ -44,7 +40,6 @@ public class OccupiedZones : MonoBehaviour
         Debug.Log($"Total occupied tiles: {occupiedTiles.Count}");
     }
 
-    // Utility method to get tiles within a radius
     List<Grid.Tile> GetTilesWithinRadius(Grid.Tile centerTile, float radius)
     {
         List<Grid.Tile> tilesInRange = new List<Grid.Tile>();
@@ -64,17 +59,13 @@ public class OccupiedZones : MonoBehaviour
         return tilesInRange;
     }
 
-    // Visualize the occupied zones using Debug.DrawLine with dynamic height based on distance
     private void MarkZombieZone(Grid.Tile tile, Vector3 zombiePosition)
     {
         Vector3 tilePosition = Grid.Instance.WorldPos(tile);
         float distanceToZombie = Vector3.Distance(tilePosition, zombiePosition);
-
-        // Dynamically adjust the height based on distance to the zombie
         float dynamicHeight = Mathf.Lerp(0.5f, lineHeightMultiplier, distanceToZombie / dangerRadius);
 
-        // Draw a dynamic vertical red line based on the distance
-        Debug.DrawLine(tilePosition, tilePosition + Vector3.up * dynamicHeight, Color.Lerp(Color.yellow, Color.red, distanceToZombie / dangerRadius), 0.1f); // 0.1f means this line updates every frame
+        Debug.DrawLine(tilePosition, tilePosition + Vector3.up * dynamicHeight, Color.Lerp(Color.yellow, Color.red, distanceToZombie / dangerRadius), 0.1f); 
     }
 
     public List<Grid.Tile> GetOccupiedTiles()
