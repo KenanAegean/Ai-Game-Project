@@ -4,16 +4,19 @@ using UnityEngine;
 public class Pathfinding
 {
     private Grid grid;
+    private OccupiedZones occupiedZones;
 
     public Pathfinding(Grid grid)
     {
         this.grid = grid;
+        this.occupiedZones = GameObject.FindObjectOfType<OccupiedZones>();
     }
 
     public List<Grid.Tile> FindPath(Grid.Tile startTile, Grid.Tile targetTile)
     {
         List<Grid.Tile> openSet = new List<Grid.Tile> { startTile };
         HashSet<Grid.Tile> closedSet = new HashSet<Grid.Tile>();
+        List<Grid.Tile> dangerTiles = occupiedZones.GetOccupiedTiles();
 
         Dictionary<Grid.Tile, Grid.Tile> cameFrom = new Dictionary<Grid.Tile, Grid.Tile>();
         Dictionary<Grid.Tile, int> gScore = new Dictionary<Grid.Tile, int>();
@@ -22,13 +25,25 @@ public class Pathfinding
         gScore[startTile] = 0;
         fScore[startTile] = GetHeuristic(startTile, targetTile);
 
+        Debug.Log($"Starting pathfinding from ({startTile.x}, {startTile.y}) to ({targetTile.x}, {targetTile.y})");
+
+        // If the start or target tile is in danger tiles, log a warning
+        if (dangerTiles.Contains(startTile))
+        {
+            Debug.LogWarning("Start tile is in a danger zone!");
+        }
+        if (dangerTiles.Contains(targetTile))
+        {
+            Debug.LogWarning("Target tile is in a danger zone!");
+        }
+
         while (openSet.Count > 0)
         {
             Grid.Tile currentTile = GetLowestFScoreTile(openSet, fScore);
 
             if (currentTile == targetTile)
             {
-                return ReconstructPath(cameFrom, currentTile); // Found the path
+                return ReconstructPath(cameFrom, currentTile); // Path found
             }
 
             openSet.Remove(currentTile);
@@ -36,9 +51,9 @@ public class Pathfinding
 
             foreach (Grid.Tile neighbor in GetNeighbors(currentTile))
             {
-                if (closedSet.Contains(neighbor) || neighbor.occupied) // Skip occupied or already processed tiles
+                if (closedSet.Contains(neighbor) || neighbor.occupied || dangerTiles.Contains(neighbor))
                 {
-                    continue;
+                    continue; // Skip if occupied or in danger zone
                 }
 
                 int tentativeGScore = gScore[currentTile] + 1; // Distance between adjacent tiles is always 1
@@ -58,10 +73,10 @@ public class Pathfinding
         }
 
         Debug.LogError("No path found!");
-        return null; // No path found
+        return null;
     }
 
-    // Get the neighbors of the current tile, restricted to up, down, left, and right
+
     private List<Grid.Tile> GetNeighbors(Grid.Tile tile)
     {
         List<Grid.Tile> neighbors = new List<Grid.Tile>();
@@ -74,19 +89,17 @@ public class Pathfinding
             Grid.Tile neighbor = Grid.Instance.TryGetTile(new Vector2Int(tile.x + dir.x, tile.y + dir.y));
             if (neighbor != null && !neighbor.occupied)
             {
-                neighbors.Add(neighbor); // Add only unoccupied neighboring tiles
+                neighbors.Add(neighbor);
             }
         }
 
         return neighbors;
     }
 
-
-
-    // Heuristic function (Manhattan distance for grid movement)
+    // Heuristic function
     private int GetHeuristic(Grid.Tile a, Grid.Tile b)
     {
-        return Mathf.Abs(a.x - b.x) + Mathf.Abs(a.y - b.y); // Manhattan distance (no diagonals)
+        return Mathf.Abs(a.x - b.x) + Mathf.Abs(a.y - b.y);
     }
 
     // Get the tile with the lowest F score
@@ -107,7 +120,6 @@ public class Pathfinding
         return lowestFScoreTile;
     }
 
-    // Reconstruct the path by backtracking through the "cameFrom" map
     private List<Grid.Tile> ReconstructPath(Dictionary<Grid.Tile, Grid.Tile> cameFrom, Grid.Tile currentTile)
     {
         List<Grid.Tile> path = new List<Grid.Tile> { currentTile };
@@ -115,7 +127,7 @@ public class Pathfinding
         while (cameFrom.ContainsKey(currentTile))
         {
             currentTile = cameFrom[currentTile];
-            path.Insert(0, currentTile); // Insert the tile at the start of the list to reverse the path
+            path.Insert(0, currentTile);
         }
 
         return path;
