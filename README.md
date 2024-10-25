@@ -47,5 +47,6 @@ Screenshots           |  Screenshots
 ![](Assets/Other/1.png)  |  ![](Assets/Other/3.png)
 ![](Assets/Other/2.png)  |  ![](Assets/Other/4.png)
 
+
 <br><b>Video - First Assigment:</b>  
-<video src="https://github.com/user-attachments/assets/1362650d-4468-4e34-9784-19760b629662" width=180/></video>
+<video src="https://github.com/user-attachments/assets/6b50a6a1-7cca-4ab9-93de-8ccc9dbbbe10" width=180/></video>
