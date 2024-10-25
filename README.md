@@ -7,11 +7,11 @@ Game Project of Arifical Intellingent Course
 
 <p align="center">
   <img src="Assets/Other/logo.png" width="350" title="hover text"><br>
-  <a href="https://kenanaegean.github.io/Lord-Of-The-Horde/">Try Game On Browser</a>
+  <a href="https://kenanaegean.github.io/Ai-Game-Project/">Test It On Browser</a>
 </p>
 
-## First Assigment
-### First Assigment Description
+## Assigment
+### Assigment Description
 ```
 AI – Assignment
 
@@ -40,7 +40,7 @@ To hand in : Submit a unity project in a zipped folder to omniway. Remember to r
 the “Library” folder inside the unity project.
 ```
 
-<br><b>Screenshots - First Assigment:</b>
+<br><b>Screenshots:</b>
 
 Screenshots           |  Screenshots 
 :-------------------------:|:-------------------------:
@@ -48,5 +48,5 @@ Screenshots           |  Screenshots
 ![](Assets/Other/2.png)  |  ![](Assets/Other/4.png)
 
 
-<br><b>Video - First Assigment:</b>  
+<br><b>Video:</b>  
 <video src="https://github.com/user-attachments/assets/6b50a6a1-7cca-4ab9-93de-8ccc9dbbbe10" width=180/></video>
