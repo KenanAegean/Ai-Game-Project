@@ -7,7 +7,7 @@ Game Project of Arifical Intellingent Course
 
 <p align="center">
   <img src="Assets/Other/logo.png" width="350" title="hover text"><br>
-  <a href="https://kenanaegean.github.io/Ai-Game-Project/">Test It On Browser</a>
+  <a href="https://kenanaegean.github.io/Ai-PathFinding-Project/">Test It On Browser</a>
 </p>
 
 ## Assigment
